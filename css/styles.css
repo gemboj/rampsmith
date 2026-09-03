@@ -1,13 +1,16 @@
 /* Rampsmith - ported from mockup/Main.dc.html's own <style> block.
    Desktop layout first (parity pass); responsive rules added in a later
-   pass - see [[verify-mockup-layout-fits]], [[single-global-scrollbar]]. */
+   pass - see [[verify-mockup-layout-fits]].
+
+   Desktop is a single, non-scrolling page: #app-root fills the viewport
+   and only .colors-scroll (the base-color/ramp list) scrolls internally -
+   see [[single-page-no-scroll]]. Below the mobile breakpoint this reverts
+   to a normal stacked, page-scrolling layout since a dense curve-editor
+   grid can't realistically fit a phone viewport without scrolling. */
 
 * { box-sizing: border-box; }
 
-/* No internal scrollbars anywhere in this app - html/body are the ONE
-   place that scrolls, as a single global scrollbar. See
-   [[single-global-scrollbar]]. */
-html, body { margin: 0; padding: 0; overflow-y: auto; overflow-x: hidden; background: oklch(15% 0.03 290); }
+html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; background: oklch(15% 0.03 290); }
 
 a { color: oklch(80% 0.15 195); }
 a:hover { color: oklch(88% 0.13 195); }
@@ -106,6 +109,10 @@ a:hover { color: oklch(88% 0.13 195); }
   flex-shrink: 0;
   user-select: none;
   -webkit-user-select: none;
+}
+.action-btn-sm {
+  width: 28px;
+  height: 28px;
 }
 .color-input {
   padding: 0;
@@ -228,6 +235,57 @@ a:hover { color: oklch(88% 0.13 195); }
   -webkit-user-select: none;
   border-color: oklch(20% 0.035 290);
   box-shadow: inset 2px 2px 0 0 oklch(20% 0.035 290), inset -2px -2px 0 0 oklch(30% 0.04 290);
+  background: oklch(11% 0.025 290);
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+.curve-card-row {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+.curve-card {
+  background: oklch(23% 0.035 290);
+  border: 3px solid oklch(9% 0.02 290);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+}
+.wheel-panel-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+.wheel-disc-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wheel-disc {
+  position: relative;
+  height: 100%;
+  max-height: 380px;
+  aspect-ratio: 1;
+  max-width: 100%;
+  border-radius: 50%;
+  border: 3px solid oklch(9% 0.02 290);
+  background: radial-gradient(circle closest-side, oklch(100% 0 0) 0%, transparent 100%), conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
 }
 .wheel-dot-hit {
   cursor: grab;
@@ -239,24 +297,24 @@ a:hover { color: oklch(88% 0.13 195); }
 .wheel-dot-hit:active {
   cursor: grabbing;
 }
-body {
+body, .colors-scroll {
   scrollbar-width: thin;
   scrollbar-color: oklch(80% 0.15 195) oklch(11% 0.025 290);
 }
-body::-webkit-scrollbar {
+body::-webkit-scrollbar, .colors-scroll::-webkit-scrollbar {
   width: 14px;
 }
-body::-webkit-scrollbar-track {
+body::-webkit-scrollbar-track, .colors-scroll::-webkit-scrollbar-track {
   background: oklch(11% 0.025 290);
   border: 3px solid oklch(9% 0.02 290);
   border-radius: 0;
 }
-body::-webkit-scrollbar-thumb {
+body::-webkit-scrollbar-thumb, .colors-scroll::-webkit-scrollbar-thumb {
   background: oklch(80% 0.15 195);
   border: 3px solid oklch(9% 0.02 290);
   border-radius: 0;
 }
-body::-webkit-scrollbar-thumb:hover {
+body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hover {
   background: oklch(88% 0.13 195);
 }
 .value-input {
@@ -283,13 +341,15 @@ body::-webkit-scrollbar-thumb:hover {
 #app-root {
   width: 100%;
   max-width: 1440px;
-  min-height: 920px;
+  height: 100vh;
+  max-height: 100vh;
   margin: 0 auto;
   background: oklch(15% 0.03 290);
   font-family: 'Share Tech Mono', monospace;
   font-size: 14px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .pf-header {
   height: 84px;
@@ -302,23 +362,12 @@ body::-webkit-scrollbar-thumb:hover {
 }
 .pf-content {
   flex: 1;
-  display: flex;
-  gap: 24px;
-  padding: 24px 32px 32px;
-}
-.pf-left-col {
-  flex: 1;
-  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-.pf-right-col {
-  width: 460px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  gap: 20px;
+  padding: 20px 32px 24px;
+  overflow: hidden;
 }
 .pf-header-right {
   align-items: stretch;
@@ -326,18 +375,115 @@ body::-webkit-scrollbar-thumb:hover {
   min-width: 0;
 }
 
+/* ==== Colors panel (top) - the only part of the page that scrolls ==== */
+.colors-panel {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.colors-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+/* ==== Bottom panel (Shift Settings / Color Wheel) - vertical tabs on the
+   left, fixed height so it never needs to scroll; only the colors panel
+   above absorbs leftover/short viewport height. ==== */
+.bottom-panel {
+  flex-shrink: 0;
+  height: 340px;
+  display: flex;
+  flex-direction: row;
+}
+.vertical-tabs {
+  flex-shrink: 0;
+  width: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 8px;
+  border-right: 3px solid oklch(9% 0.02 290);
+}
+.vtabs-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.vtab-icon-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.tabs-divider {
+  width: 100%;
+  height: 1px;
+  background: oklch(30% 0.04 290);
+  flex-shrink: 0;
+  margin: 14px 0;
+}
+.config-controls-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.config-controls-divider {
+  width: 100%;
+  height: 1px;
+  background: oklch(30% 0.04 290);
+  flex-shrink: 0;
+  margin: 2px 0;
+}
+.bottom-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px;
+  display: flex;
+}
+
 /* ==== Responsive pass ====
-   Desktop layout (above) is unchanged; below these breakpoints the same
-   panels reflow to a single column instead of a separate mobile design -
-   see project decision to use one responsive layout, not two. Verified at
-   375/768/1440px with headless Chromium, per [[verify-mockup-layout-fits]].
-   Still exactly one scrollbar (html/body) at every width - see
-   [[single-global-scrollbar]] - nothing here adds overflow to a panel. */
+   Below this breakpoint, fitting a dense curve-editor grid without any
+   scrolling isn't realistic, so the page reverts to a normal stacked,
+   page-scrolling layout instead - verified at 375/768px with headless
+   Chromium. Above the breakpoint, exactly one scrollbar exists
+   (.colors-scroll) and the page itself never scrolls - see
+   [[single-page-no-scroll]]. */
 @media (max-width: 1023px) {
-  #app-root { min-height: 0; }
-  .pf-content { flex-direction: column; padding: 20px 16px 28px; gap: 20px; }
-  .pf-left-col { min-width: 0; }
-  .pf-right-col { width: 460px; max-width: 100%; margin: 0 auto; }
+  html, body { overflow: auto; height: auto; }
+  #app-root { height: auto; max-height: none; overflow: visible; }
+  .pf-content { flex-direction: column; padding: 20px 16px 28px; gap: 20px; overflow: visible; }
+  .colors-panel { min-height: 0; }
+  .colors-scroll { flex: none; overflow-y: visible; }
+  .bottom-panel { flex-direction: column; height: auto; }
+  .vertical-tabs {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+    border-right: none;
+    border-bottom: 3px solid oklch(9% 0.02 290);
+  }
+  .vtabs-col { flex-direction: row; }
+  .tabs-divider { width: 1px; height: 40px; margin: 0 14px; }
+  .config-controls-row { flex-direction: row; }
+  .config-controls-divider { width: 1px; height: 32px; margin: 0 2px; }
+  .bottom-content { padding: 16px; }
+  .curve-card-row { flex-direction: column; height: auto; }
+  .curve-card { height: auto; }
+  .curve-plot { flex: none; height: 208px; }
+  .wheel-panel-root { height: auto; }
+  .wheel-disc-wrap { flex: none; }
+  .wheel-disc { height: auto; width: min(380px, 100%); max-height: none; }
   .pf-header {
     height: auto;
     flex-direction: column;

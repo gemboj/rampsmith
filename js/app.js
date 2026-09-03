@@ -92,15 +92,25 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
   var resetBtn = h('div', { className: 'bevel-raised step-btn', title: 'Reset to default' },
     svgFromMarkup('<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h5"></path><path d="M4.5 9a6.5 6.5 0 1 1 1.8 6.6"></path></svg>'));
   resetBtn.addEventListener('click', function () { updateComp(key, defaultComponent(key)); });
-  var headerRow = h('div', { style: 'display:flex;align-items:center;justify-content:space-between;' }, [
+  var headerRow = h('div', { style: 'display:flex;align-items:center;justify-content:space-between;flex-shrink:0;' }, [
     h('div', { style: 'display:flex;align-items:center;gap:10px;' }, [swatch, labelEl]),
     resetBtn,
   ]);
 
-  var svg = svgEl('svg', { width: '100%', height: '100%', viewBox: '0 0 360 208', preserveAspectRatio: 'none', style: 'display:block;' });
-  svg.appendChild(svgEl('rect', { x: 4, y: 52, width: 352, height: 104, fill: 'oklch(14% 0.03 290)', stroke: 'oklch(30% 0.04 290)', 'stroke-width': 1 }));
-  svg.appendChild(svgEl('line', { x1: 20, y1: 104, x2: 340, y2: 104, stroke: 'oklch(30% 0.04 290)', 'stroke-width': 1, 'stroke-dasharray': '3,3' }));
-  svg.appendChild(svgEl('line', { x1: 180, y1: 44, x2: 180, y2: 164, stroke: 'oklch(26% 0.035 290)', 'stroke-width': 1, 'stroke-dasharray': '2,3' }));
+  // plotW/plotH track the SVG's actual rendered pixel size (kept in sync
+  // via ResizeObserver below) so the viewBox always matches 1:1 - no
+  // preserveAspectRatio scaling, which used to stretch the curve and turn
+  // its round anchor/handle dots into ellipses whenever a card's aspect
+  // ratio drifted from the old fixed 360x208 logical size.
+  var plotW = PLOT_W, plotH = PLOT_H;
+  var svg = svgEl('svg', { width: '100%', height: '100%', viewBox: '0 0 ' + plotW + ' ' + plotH, style: 'display:block;' });
+  var frame = computeCurvePlotFrame(plotW, plotH);
+  var frameRect = svgEl('rect', { x: frame.rect.x, y: frame.rect.y, width: frame.rect.width, height: frame.rect.height, fill: 'oklch(14% 0.03 290)', stroke: 'oklch(30% 0.04 290)', 'stroke-width': 1 });
+  var hLine = svgEl('line', { x1: frame.hLine.x1, y1: frame.hLine.y, x2: frame.hLine.x2, y2: frame.hLine.y, stroke: 'oklch(30% 0.04 290)', 'stroke-width': 1, 'stroke-dasharray': '3,3' });
+  var vLine = svgEl('line', { x1: frame.vLine.x, y1: frame.vLine.y1, x2: frame.vLine.x, y2: frame.vLine.y2, stroke: 'oklch(26% 0.035 290)', 'stroke-width': 1, 'stroke-dasharray': '2,3' });
+  svg.appendChild(frameRect);
+  svg.appendChild(hLine);
+  svg.appendChild(vLine);
   var polyline = svgEl('polyline', { points: '', fill: 'none', stroke: lineColor, 'stroke-width': 2 });
   svg.appendChild(polyline);
 
@@ -121,13 +131,38 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
   }
   var leftHandle = makeHandleVisual(), centerLeftHandle = makeHandleVisual(), centerRightHandle = makeHandleVisual(), rightHandle = makeHandleVisual();
 
-  var plotWrap = h('div', { className: 'bevel-well curve-plot', style: 'width:100%;height:208px;background:oklch(11% 0.025 290);' }, svg);
+  var plotWrap = h('div', { className: 'bevel-well curve-plot' }, svg);
+
+  // Redraw at the plot's actual rendered size whenever it changes (card
+  // width flexes with the viewport; see [[curve-plot-no-stretch]]) instead
+  // of leaving the SVG to non-uniformly scale via viewBox/preserveAspectRatio.
+  if (typeof ResizeObserver !== 'undefined') {
+    var resizeObserver = new ResizeObserver(function (entries) {
+      var entry = entries[entries.length - 1];
+      var box = entry.contentBoxSize && entry.contentBoxSize[0]
+        ? { width: entry.contentBoxSize[0].inlineSize, height: entry.contentBoxSize[0].blockSize }
+        : entry.contentRect;
+      var w = Math.round(box.width), h = Math.round(box.height);
+      if (w <= 0 || h <= 0 || (w === plotW && h === plotH)) return;
+      plotW = w; plotH = h;
+      svg.setAttribute('viewBox', '0 0 ' + plotW + ' ' + plotH);
+      var f = computeCurvePlotFrame(plotW, plotH);
+      frameRect.setAttribute('x', f.rect.x); frameRect.setAttribute('y', f.rect.y);
+      frameRect.setAttribute('width', f.rect.width); frameRect.setAttribute('height', f.rect.height);
+      hLine.setAttribute('x1', f.hLine.x1); hLine.setAttribute('x2', f.hLine.x2);
+      hLine.setAttribute('y1', f.hLine.y); hLine.setAttribute('y2', f.hLine.y);
+      vLine.setAttribute('x1', f.vLine.x); vLine.setAttribute('x2', f.vLine.x);
+      vLine.setAttribute('y1', f.vLine.y1); vLine.setAttribute('y2', f.vLine.y2);
+      update();
+    });
+    resizeObserver.observe(plotWrap);
+  }
 
   function rangeInput() { return h('input', { type: 'number', className: 'value-input pixel-text' }); }
   var leftRangeInput = rangeInput(), centerRangeInput = rangeInput(), rightRangeInput = rangeInput();
-  var inputsRow = h('div', { style: 'display:flex;justify-content:space-between;align-items:center;' }, [leftRangeInput, centerRangeInput, rightRangeInput]);
+  var inputsRow = h('div', { style: 'display:flex;justify-content:space-between;align-items:center;flex-shrink:0;' }, [leftRangeInput, centerRangeInput, rightRangeInput]);
 
-  var root = h('div', { style: 'background:oklch(23% 0.035 290);border:3px solid oklch(9% 0.02 290);padding:16px;display:flex;flex-direction:column;gap:12px;' }, [headerRow, plotWrap, inputsRow]);
+  var root = h('div', { className: 'curve-card' }, [headerRow, plotWrap, inputsRow]);
 
   var stopClick = function (e) { e.stopPropagation(); };
 
@@ -181,7 +216,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
       onPointerMove: function (e) {
         if (e.buttons === 0) return;
         var pt = svgLocalPoint(e);
-        setRange(sideName, clamp(Math.round(yToVal(pt.y, domainMin, domainMax)), domainMin, domainMax));
+        setRange(sideName, clamp(Math.round(yToVal(pt.y, domainMin, domainMax, plotH)), domainMin, domainMax));
       },
       onPointerUp: function (e) { try { e.target.releasePointerCapture(e.pointerId); } catch (err) {} },
     };
@@ -196,7 +231,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
         if (e.buttons === 0) return;
         var pt = svgLocalPoint(e);
         var patch = {};
-        patch[handleName] = { tFrac: pxToHandleFrac(pt.x, side), y: pxToHandleVal(pt.y, domainMin, domainMax) };
+        patch[handleName] = { tFrac: pxToHandleFrac(pt.x, side, plotW), y: pxToHandleVal(pt.y, domainMin, domainMax, plotH) };
         updateComp(key, patch);
       },
       onPointerUp: function (e) { try { e.target.releasePointerCapture(e.pointerId); } catch (err) {} },
@@ -211,8 +246,8 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
       onPointerMove: function (e) {
         if (e.buttons === 0) return;
         var pt = svgLocalPoint(e);
-        var tFrac = pxToHandleFrac(pt.x, displaySide);
-        var y = pxToHandleVal(pt.y, domainMin, domainMax);
+        var tFrac = pxToHandleFrac(pt.x, displaySide, plotW);
+        var y = pxToHandleVal(pt.y, domainMin, domainMax, plotH);
         var latestComp = currentCompFor(key);
         var X = state.X;
         var signedDist = displaySide === 'right' ? tFrac * X : -tFrac * X;
@@ -269,7 +304,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
   function update() {
     var comp = currentCompFor(key);
     var X = state.X;
-    var curveData = computeCurveSvg(comp, X, absoluteTarget);
+    var curveData = computeCurveSvg(comp, X, absoluteTarget, plotW, plotH);
     polyline.setAttribute('points', curveData.points);
 
     leftAnchor.hit.setAttribute('cx', curveData.leftAnchor.x); leftAnchor.hit.setAttribute('cy', curveData.leftAnchor.y);
@@ -301,46 +336,17 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
 }
 
 // ---------------------------------------------------------------------------
-// Shift Settings panel (dice/info/delete header + the 3 curve cards).
+// Shift Settings panel - just the 3 curve cards side by side. The
+// dice/info/add/delete config controls live in the vertical-tabs sidebar
+// (buildBottomPanel) instead of a repeated in-panel header, since the tab
+// itself already says "SHIFT SETTINGS".
 // ---------------------------------------------------------------------------
 function buildShiftPanel() {
   cardRefs.hue = buildCard('hue', 'HUE', 'background: linear-gradient(90deg, red, yellow, lime, cyan, blue, magenta, red);', 'oklch(80% 0.15 195)', false);
   cardRefs.sat = buildCard('sat', 'CHROMA', 'background: linear-gradient(90deg, oklch(55% 0 0), oklch(75% 0.18 345));', 'oklch(75% 0.18 345)', true);
   cardRefs.val = buildCard('val', 'LIGHTNESS', 'background: linear-gradient(90deg, #000000, #ffffff);', 'oklch(85% 0.17 95)', true);
 
-  refs.activeDiceSvg = svgEl('svg', { width: 18, height: 18, viewBox: '0 0 20 20' });
-  refs.activeDiceBtn = h('div', { className: 'bevel-raised', style: 'width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;' }, refs.activeDiceSvg);
-  refs.activeDiceBtn.addEventListener('click', onCycleActiveConfig);
-
-  var label = h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'SHIFT SETTINGS');
-
-  var infoBtn = h('div', { className: 'info-btn' }, [
-    h('div', { className: 'bevel-well', style: 'width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:help;' },
-      h('span', { className: 'pixel-label', style: 'font-size:11px;color:oklch(70% 0.13 195);line-height:1;' }, 'i')),
-    h('div', { className: 'info-popover' }, [
-      h('div', {}, [
-        h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'GRAPHS'),
-        h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, 'Drag a dot on the graph or type a value. Double-click a dot to switch it between automatic (white) and manual (hollow) tangents.'),
-      ]),
-      h('div', {}, [
-        h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'CONFIGURATIONS'),
-        h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, "The dice icon (left) cycles through the configurations these cards edit - up to 6. Each base color has its own dice icon to assign it a configuration; colors sharing one share its shift settings. The + adds a new configuration; the X deletes the current one (at least one must remain)."),
-      ]),
-    ]),
-  ]);
-
-  refs.addConfigBtn = h('div', { className: 'bevel-raised action-btn' },
-    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M10 4v12M4 10h12"></path></svg>'));
-  refs.addConfigBtn.addEventListener('click', onAddConfig);
-
-  refs.deleteConfigBtn = h('div', { className: 'bevel-raised action-btn' },
-    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M4 4l12 12M16 4L4 16"></path></svg>'));
-  refs.deleteConfigBtn.addEventListener('click', onDeleteActiveConfig);
-
-  var headerRow = h('div', { style: 'display:flex;align-items:center;gap:8px;' }, [refs.activeDiceBtn, label, infoBtn, refs.addConfigBtn, refs.deleteConfigBtn]);
-
-  return h('div', { className: 'bevel-raised', style: 'flex:1;background:oklch(19% 0.035 290);padding:20px;display:flex;flex-direction:column;gap:16px;' },
-    [headerRow, cardRefs.hue.root, cardRefs.sat.root, cardRefs.val.root]);
+  return h('div', { className: 'curve-card-row' }, [cardRefs.hue.root, cardRefs.sat.root, cardRefs.val.root]);
 }
 
 function onCycleActiveConfig() {
@@ -375,7 +381,7 @@ function updateShiftPanel() {
   });
   refs.activeDiceBtn.title = 'Configuration ' + (activeConfigIndex + 1) + ' — click to switch which configuration these cards edit';
   var canAdd = state.shiftConfigs.length < SHIFT_CONFIG_COUNT_MAX;
-  refs.addConfigBtn.style.cssText = (canAdd ? '' : STYLE_DISABLED) + 'margin-left:auto;';
+  refs.addConfigBtn.style.cssText = canAdd ? '' : STYLE_DISABLED;
   refs.addConfigBtn.title = 'Add a new configuration';
   var canDelete = state.shiftConfigs.length > 1;
   refs.deleteConfigBtn.style.cssText = canDelete ? '' : STYLE_DISABLED;
@@ -386,18 +392,15 @@ function updateShiftPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Color wheel panel.
+// Color wheel panel. No repeated "COLOR WHEEL" title - the tab already
+// says that; just a short caption and the disc itself.
 // ---------------------------------------------------------------------------
 function buildWheelPanel() {
-  var title = h('div', {}, [
-    h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'COLOR WHEEL'),
-    h('div', { className: 'pixel-text', style: 'font-size:13px;color:oklch(65% 0.02 290);margin-top:6px;' }, "Hue by angle, saturation by distance from center, value fixed at 100%. Drag a dot to retune that base color's hue/saturation."),
-  ]);
-  refs.wheelDisc = h('div', {
-    className: 'wheel-disc',
-    style: 'position:relative;width:min(' + WHEEL_SIZE + 'px, 100%);aspect-ratio:1;border-radius:50%;border:3px solid oklch(9% 0.02 290);background:radial-gradient(circle closest-side, oklch(100% 0 0) 0%, transparent 100%), conic-gradient(red, yellow, lime, cyan, blue, magenta, red);',
-  });
-  return h('div', { className: 'bevel-raised', style: 'flex:1;background:oklch(19% 0.035 290);padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px;' }, [title, refs.wheelDisc]);
+  var caption = h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(65% 0.02 290);text-align:center;max-width:420px;flex-shrink:0;' },
+    "Hue by angle, saturation by distance from center, value fixed at 100%. Drag a dot to retune that base color's hue/saturation.");
+  refs.wheelDisc = h('div', { className: 'wheel-disc' });
+  var discWrap = h('div', { className: 'wheel-disc-wrap' }, refs.wheelDisc);
+  return h('div', { className: 'wheel-panel-root' }, [caption, discWrap]);
 }
 
 function ensureWheelMarker(id) {
@@ -760,10 +763,11 @@ function updateBaseColorsHeader() {
 
 function updateRightTabs() {
   var isShift = (state.rightTab || 'shift') !== 'wheel';
-  refs.tabShiftBtn.className = 'tab-btn pixel-label ' + (isShift ? 'tab-active' : 'tab-inactive');
-  refs.tabWheelBtn.className = 'tab-btn pixel-label ' + (!isShift ? 'tab-active' : 'tab-inactive');
+  refs.tabShiftBtn.className = 'tab-btn vtab-icon-btn ' + (isShift ? 'tab-active' : 'tab-inactive');
+  refs.tabWheelBtn.className = 'tab-btn vtab-icon-btn ' + (!isShift ? 'tab-active' : 'tab-inactive');
   refs.shiftPanel.style.display = isShift ? 'flex' : 'none';
   refs.wheelPanel.style.display = !isShift ? 'flex' : 'none';
+  refs.configControlsRow.style.display = isShift ? 'flex' : 'none';
 }
 
 function updateHeader() {
@@ -793,9 +797,9 @@ function onRootClick() {
 // ---------------------------------------------------------------------------
 // Shell assembly.
 // ---------------------------------------------------------------------------
-function buildLeftColumn() {
-  var col = h('div', { className: 'pf-left-col' });
-  var panel = h('div', { className: 'bevel-raised', style: 'flex:1;min-width:0;background:oklch(19% 0.035 290);padding:20px;display:flex;flex-direction:column;' });
+function buildColorsPanel() {
+  var col = h('div', { className: 'colors-panel' });
+  var panel = h('div', { className: 'bevel-raised', style: 'flex:1;min-width:0;min-height:0;background:oklch(19% 0.035 290);padding:20px;display:flex;flex-direction:column;' });
 
   var baseColorsLabel = h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'BASE COLORS');
   refs.colorDecBtn = h('div', { className: 'bevel-raised step-btn' }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M13 4l-7 6 7 6"></path></svg>'));
@@ -827,7 +831,7 @@ function buildLeftColumn() {
 
   refs.colorList = h('div', {});
   refs.noColorsMsg = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(55% 0.02 290);padding:20px 0;text-align:center;' }, 'No base colors yet.');
-  var colorListWrapper = h('div', { style: 'padding:5px;margin-bottom:16px;' }, [refs.colorList, refs.noColorsMsg]);
+  var colorListWrapper = h('div', { className: 'colors-scroll' }, [refs.colorList, refs.noColorsMsg]);
 
   panel.appendChild(controlsRow);
   panel.appendChild(divider);
@@ -852,21 +856,67 @@ function buildLeftColumn() {
   return col;
 }
 
-function buildRightColumn() {
-  var col = h('div', { className: 'pf-right-col' });
-  refs.tabShiftBtn = h('div', { className: 'tab-btn pixel-label', style: 'flex:1;text-align:center;font-size:12px;padding:10px 8px;' }, 'SHIFT SETTINGS');
-  refs.tabWheelBtn = h('div', { className: 'tab-btn pixel-label', style: 'flex:1;text-align:center;font-size:12px;padding:10px 8px;' }, 'COLOR WHEEL');
-  var tabsRow = h('div', { style: 'display:flex;gap:6px;flex-shrink:0;' }, [refs.tabShiftBtn, refs.tabWheelBtn]);
+// ---------------------------------------------------------------------------
+// Bottom panel: a slim vertical-tabs sidebar (SHIFT SETTINGS / COLOR WHEEL,
+// doubling as the only place those names appear - no repeated in-panel
+// titles) plus the active panel's content. The dice/info/add/delete
+// shift-config controls live in that same sidebar, below the tabs.
+// ---------------------------------------------------------------------------
+function buildBottomPanel() {
+  var panel = h('div', { className: 'bevel-raised bottom-panel', style: 'background:oklch(19% 0.035 290);' });
+
+  var shiftIcon = svgFromMarkup('<svg width="34" height="34" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="18" height="18" stroke="currentColor" stroke-width="1.4"></rect><polyline points="3.5,15 8,6.5 11,11.5 16.5,3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>');
+  refs.tabShiftBtn = h('div', { className: 'tab-btn vtab-icon-btn', title: 'Shift Settings' }, shiftIcon);
+
+  var wheelIcon = h('div', { style: 'width:18px;height:18px;border-radius:50%;flex-shrink:0;background:conic-gradient(red, yellow, lime, cyan, blue, magenta, red);' });
+  refs.tabWheelBtn = h('div', { className: 'tab-btn vtab-icon-btn', title: 'Color Wheel' }, wheelIcon);
+
   refs.tabShiftBtn.addEventListener('click', function () { setState({ rightTab: 'shift' }); });
   refs.tabWheelBtn.addEventListener('click', function () { setState({ rightTab: 'wheel' }); });
+  var tabsCol = h('div', { className: 'vtabs-col' }, [refs.tabShiftBtn, refs.tabWheelBtn]);
+
+  var tabsDivider = h('div', { className: 'tabs-divider' });
+
+  refs.activeDiceSvg = svgEl('svg', { width: 18, height: 18, viewBox: '0 0 20 20' });
+  refs.activeDiceBtn = h('div', { className: 'bevel-raised', style: 'width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;', title: 'Cycle configuration' }, refs.activeDiceSvg);
+  refs.activeDiceBtn.addEventListener('click', onCycleActiveConfig);
+
+  var infoBtn = h('div', { className: 'info-btn' }, [
+    h('div', { className: 'bevel-well', style: 'width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:help;' },
+      h('span', { className: 'pixel-label', style: 'font-size:11px;color:oklch(70% 0.13 195);line-height:1;' }, 'i')),
+    h('div', { className: 'info-popover' }, [
+      h('div', {}, [
+        h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'GRAPHS'),
+        h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, 'Drag a dot on the graph or type a value. Double-click a dot to switch it between automatic (white) and manual (hollow) tangents.'),
+      ]),
+      h('div', {}, [
+        h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'CONFIGURATIONS'),
+        h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, "The dice icon cycles through the configurations these cards edit - up to 6. Each base color has its own dice icon to assign it a configuration; colors sharing one share its shift settings. The + adds a new configuration; the X deletes the current one (at least one must remain)."),
+      ]),
+    ]),
+  ]);
+
+  refs.addConfigBtn = h('div', { className: 'bevel-raised action-btn action-btn-sm' },
+    svgFromMarkup('<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M10 4v12M4 10h12"></path></svg>'));
+  refs.addConfigBtn.addEventListener('click', onAddConfig);
+
+  refs.deleteConfigBtn = h('div', { className: 'bevel-raised action-btn action-btn-sm' },
+    svgFromMarkup('<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M4 4l12 12M16 4L4 16"></path></svg>'));
+  refs.deleteConfigBtn.addEventListener('click', onDeleteActiveConfig);
+
+  var configDivider = h('div', { className: 'config-controls-divider' });
+  refs.configControlsRow = h('div', { className: 'config-controls-row' },
+    [refs.activeDiceBtn, infoBtn, configDivider, refs.addConfigBtn, refs.deleteConfigBtn]);
+
+  var verticalTabs = h('div', { className: 'vertical-tabs' }, [tabsCol, tabsDivider, refs.configControlsRow]);
 
   refs.shiftPanel = buildShiftPanel();
   refs.wheelPanel = buildWheelPanel();
+  var content = h('div', { className: 'bottom-content' }, [refs.shiftPanel, refs.wheelPanel]);
 
-  col.appendChild(tabsRow);
-  col.appendChild(refs.shiftPanel);
-  col.appendChild(refs.wheelPanel);
-  return col;
+  panel.appendChild(verticalTabs);
+  panel.appendChild(content);
+  return panel;
 }
 
 function buildShell() {
@@ -898,7 +948,7 @@ function buildShell() {
   var headerRight = h('div', { className: 'pf-header-right', style: 'display:flex;flex-direction:column;gap:6px;' }, [shareLabel, shareRow]);
 
   var header = h('div', { className: 'pf-header' }, [headerLeft, headerRight]);
-  var content = h('div', { className: 'pf-content' }, [buildLeftColumn(), buildRightColumn()]);
+  var content = h('div', { className: 'pf-content' }, [buildColorsPanel(), buildBottomPanel()]);
 
   root.appendChild(header);
   root.appendChild(content);

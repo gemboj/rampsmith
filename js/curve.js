@@ -5,36 +5,52 @@
 // [[exact-base-color-invariant]], [[global-ramp-selection]] - none of this
 // math should be "fixed" or re-derived, only relocated.
 
-// Fixed logical plot size (the SVG uses viewBox="0 0 360 208" with
-// width/height:100%, so this stays the coordinate space regardless of how
-// large the card actually renders - see svgLocalPoint below).
-var PLOT_W = 360, PLOT_H = 208, PLOT_MARGIN_X = 20, PLOT_MARGIN_Y = 52, PLOT_CX = 180;
+// The plot's SVG viewBox is kept in sync with the card's actual rendered
+// pixel size (see buildCard's ResizeObserver in app.js) instead of a fixed
+// logical size scaled via preserveAspectRatio - that's what used to distort
+// the curve and its round anchor handles into ellipses whenever a card's
+// aspect ratio drifted from the original 360x208. Every coordinate helper
+// below therefore takes the CURRENT plot width/height as an explicit
+// parameter rather than closing over a fixed constant. Only the margins
+// stay fixed (in pixels) regardless of size.
+var PLOT_W = 360, PLOT_H = 208, PLOT_MARGIN_X = 20, PLOT_MARGIN_Y = 52;
 
-function valToY(v, domainMin, domainMax) {
+function valToY(v, domainMin, domainMax, plotH) {
   var t = (v - domainMin) / (domainMax - domainMin);
-  return (PLOT_H - PLOT_MARGIN_Y) - t * (PLOT_H - 2 * PLOT_MARGIN_Y);
+  return (plotH - PLOT_MARGIN_Y) - t * (plotH - 2 * PLOT_MARGIN_Y);
 }
-function yToVal(y, domainMin, domainMax) {
-  var t = ((PLOT_H - PLOT_MARGIN_Y) - y) / (PLOT_H - 2 * PLOT_MARGIN_Y);
+function yToVal(y, domainMin, domainMax, plotH) {
+  var t = ((plotH - PLOT_MARGIN_Y) - y) / (plotH - 2 * PLOT_MARGIN_Y);
   return domainMin + clamp(t, -0.5, 1.5) * (domainMax - domainMin);
 }
-function fracToPx(frac) { return PLOT_MARGIN_X + frac * (PLOT_W - 2 * PLOT_MARGIN_X); }
-function pxToFrac(px) { return clamp((px - PLOT_MARGIN_X) / (PLOT_W - 2 * PLOT_MARGIN_X), 0, 1); }
-var PLOT_HALF = PLOT_W / 2 - PLOT_MARGIN_X;
-function handleFracToPx(frac, side) {
-  return side === 'right' ? PLOT_CX + frac * PLOT_HALF : PLOT_CX - frac * PLOT_HALF;
+function fracToPx(frac, plotW) { return PLOT_MARGIN_X + frac * (plotW - 2 * PLOT_MARGIN_X); }
+function pxToFrac(px, plotW) { return clamp((px - PLOT_MARGIN_X) / (plotW - 2 * PLOT_MARGIN_X), 0, 1); }
+function handleFracToPx(frac, side, plotW) {
+  var cx = plotW / 2, half = cx - PLOT_MARGIN_X;
+  return side === 'right' ? cx + frac * half : cx - frac * half;
 }
-function pxToHandleFrac(px, side) {
-  var frac = side === 'right' ? (px - PLOT_CX) / PLOT_HALF : (PLOT_CX - px) / PLOT_HALF;
+function pxToHandleFrac(px, side, plotW) {
+  var cx = plotW / 2, half = cx - PLOT_MARGIN_X;
+  var frac = side === 'right' ? (px - cx) / half : (cx - px) / half;
   return clamp(frac, -1, 1);
 }
-function pxToHandleVal(y, domainMin, domainMax) { return yToVal(y, domainMin, domainMax); }
+function pxToHandleVal(y, domainMin, domainMax, plotH) { return yToVal(y, domainMin, domainMax, plotH); }
+// Background frame (well border + zero/center reference lines) as a
+// function of the plot's actual size - see computeCurveSvg's callers.
+function computeCurvePlotFrame(plotW, plotH) {
+  return {
+    rect: { x: 4, y: PLOT_MARGIN_Y, width: plotW - 8, height: plotH - 2 * PLOT_MARGIN_Y },
+    hLine: { x1: PLOT_MARGIN_X, x2: plotW - PLOT_MARGIN_X, y: plotH / 2 },
+    vLine: { x: plotW / 2, y1: PLOT_MARGIN_Y - 8, y2: (plotH - PLOT_MARGIN_Y) + 8 },
+  };
+}
 function svgLocalPoint(e) {
   var svg = e.target.closest('svg');
   var rect = svg.getBoundingClientRect();
+  var vb = svg.viewBox.baseVal;
   return {
-    x: (e.clientX - rect.left) * (PLOT_W / rect.width),
-    y: (e.clientY - rect.top) * (PLOT_H / rect.height),
+    x: (e.clientX - rect.left) * (vb.width / (rect.width || 1)),
+    y: (e.clientY - rect.top) * (vb.height / (rect.height || 1)),
   };
 }
 function wheelLocalPoint(e, size) {
@@ -265,7 +281,7 @@ function dicePips(configIndex) {
 // This function draws curveValueAt's own two Bezier segments exactly as
 // constructed. absoluteTarget only picks the vertical domain (0..100 for
 // Saturation/Value, -100..100 for Hue's signed degree deltas).
-function computeCurveSvg(comp, X, absoluteTarget) {
+function computeCurveSvg(comp, X, absoluteTarget, plotW, plotH) {
   var N = 40;
   var domainMin = absoluteTarget ? 0 : -100, domainMax = 100;
   function raw(step) { return curveValueAt(comp, X, step); }
@@ -273,18 +289,18 @@ function computeCurveSvg(comp, X, absoluteTarget) {
   for (var i = 0; i <= N; i++) {
     var frac = i / N;
     var step = -X + frac * 2 * X;
-    pts.push(fracToPx(frac).toFixed(1) + ',' + valToY(raw(step), domainMin, domainMax).toFixed(1));
+    pts.push(fracToPx(frac, plotW).toFixed(1) + ',' + valToY(raw(step), domainMin, domainMax, plotH).toFixed(1));
   }
   var handles = resolveHandles(comp, X);
   return {
     points: pts.join(' '),
-    centerX: PLOT_CX.toFixed(1),
-    centerY: valToY(comp.center.range, domainMin, domainMax).toFixed(1),
-    leftAnchor: { x: fracToPx(0).toFixed(1), y: valToY(comp.left.range, domainMin, domainMax).toFixed(1) },
-    rightAnchor: { x: fracToPx(1).toFixed(1), y: valToY(comp.right.range, domainMin, domainMax).toFixed(1) },
-    leftHandle: { x: handleFracToPx(handles.leftHandle.tFrac, 'left').toFixed(1), y: valToY(handles.leftHandle.y, domainMin, domainMax).toFixed(1) },
-    centerHandleLeft: { x: handleFracToPx(handles.centerHandleLeft.tFrac, 'left').toFixed(1), y: valToY(handles.centerHandleLeft.y, domainMin, domainMax).toFixed(1) },
-    centerHandleRight: { x: handleFracToPx(handles.centerHandleRight.tFrac, 'right').toFixed(1), y: valToY(handles.centerHandleRight.y, domainMin, domainMax).toFixed(1) },
-    rightHandle: { x: handleFracToPx(handles.rightHandle.tFrac, 'right').toFixed(1), y: valToY(handles.rightHandle.y, domainMin, domainMax).toFixed(1) },
+    centerX: (plotW / 2).toFixed(1),
+    centerY: valToY(comp.center.range, domainMin, domainMax, plotH).toFixed(1),
+    leftAnchor: { x: fracToPx(0, plotW).toFixed(1), y: valToY(comp.left.range, domainMin, domainMax, plotH).toFixed(1) },
+    rightAnchor: { x: fracToPx(1, plotW).toFixed(1), y: valToY(comp.right.range, domainMin, domainMax, plotH).toFixed(1) },
+    leftHandle: { x: handleFracToPx(handles.leftHandle.tFrac, 'left', plotW).toFixed(1), y: valToY(handles.leftHandle.y, domainMin, domainMax, plotH).toFixed(1) },
+    centerHandleLeft: { x: handleFracToPx(handles.centerHandleLeft.tFrac, 'left', plotW).toFixed(1), y: valToY(handles.centerHandleLeft.y, domainMin, domainMax, plotH).toFixed(1) },
+    centerHandleRight: { x: handleFracToPx(handles.centerHandleRight.tFrac, 'right', plotW).toFixed(1), y: valToY(handles.centerHandleRight.y, domainMin, domainMax, plotH).toFixed(1) },
+    rightHandle: { x: handleFracToPx(handles.rightHandle.tFrac, 'right', plotW).toFixed(1), y: valToY(handles.rightHandle.y, domainMin, domainMax, plotH).toFixed(1) },
   };
 }

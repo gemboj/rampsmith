@@ -1,4 +1,4 @@
-// Palette Forge - vanilla JS port of mockup/Main.dc.html.
+// Rampsmith - vanilla JS port of mockup/Main.dc.html.
 //
 // Rendering strategy: persistent DOM + imperative sync, not a virtual DOM
 // and not full-tree-rebuild-per-change. Every dynamic DOM node that carries
@@ -874,7 +874,7 @@ function buildShell() {
     logoGrid.appendChild(h('div', { style: 'background:' + LOGO_COLOR_MAP[c] + ';' }));
   });
   var titleBlock = h('div', {}, [
-    h('div', { className: 'pixel-label', style: 'font-size:20px;color:oklch(80% 0.15 195);line-height:1;' }, 'PALETTE FORGE'),
+    h('div', { className: 'pixel-label', style: 'font-size:20px;color:oklch(80% 0.15 195);line-height:1;' }, 'RAMPSMITH'),
     h('div', { className: 'pixel-text', style: 'font-size:15px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;margin-top:6px;' }, 'Pixel-Art Ramp Generator'),
   ]);
   var headerLeft = h('div', { style: 'display:flex;align-items:center;gap:16px;' }, [logoGrid, titleBlock]);

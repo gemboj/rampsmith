@@ -43,7 +43,7 @@ function exportPaletteAsPng(state) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'palette-forge.png';
+    a.download = 'rampsmith.png';
     document.body.appendChild(a);
     a.click();
     a.remove();

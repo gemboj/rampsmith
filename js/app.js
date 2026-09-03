@@ -320,20 +320,24 @@ function buildShiftPanel() {
     h('div', { className: 'info-popover' }, [
       h('div', {}, [
         h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'GRAPHS'),
-        h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(80% 0.02 290);margin-top:4px;' }, 'Drag a dot on the graph or type a value. Double-click a dot to switch it between automatic (white) and manual (hollow) tangents.'),
+        h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, 'Drag a dot on the graph or type a value. Double-click a dot to switch it between automatic (white) and manual (hollow) tangents.'),
       ]),
       h('div', {}, [
         h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'CONFIGURATIONS'),
-        h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(80% 0.02 290);margin-top:4px;' }, "The dice icon (left) cycles through the configurations these cards edit - up to 6, but a new one only opens up once you've actually used the current ones (at most one still at its defaults). Each base color has its own dice icon to assign it a configuration; colors sharing one share its shift settings. The X (right) deletes the current configuration once there are more than 2."),
+        h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, "The dice icon (left) cycles through the configurations these cards edit - up to 6. Each base color has its own dice icon to assign it a configuration; colors sharing one share its shift settings. The + adds a new configuration; the X deletes the current one (at least one must remain)."),
       ]),
     ]),
   ]);
+
+  refs.addConfigBtn = h('div', { className: 'bevel-raised action-btn' },
+    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M10 4v12M4 10h12"></path></svg>'));
+  refs.addConfigBtn.addEventListener('click', onAddConfig);
 
   refs.deleteConfigBtn = h('div', { className: 'bevel-raised action-btn' },
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M4 4l12 12M16 4L4 16"></path></svg>'));
   refs.deleteConfigBtn.addEventListener('click', onDeleteActiveConfig);
 
-  var headerRow = h('div', { style: 'display:flex;align-items:center;gap:8px;' }, [refs.activeDiceBtn, label, infoBtn, refs.deleteConfigBtn]);
+  var headerRow = h('div', { style: 'display:flex;align-items:center;gap:8px;' }, [refs.activeDiceBtn, label, infoBtn, refs.addConfigBtn, refs.deleteConfigBtn]);
 
   return h('div', { className: 'bevel-raised', style: 'flex:1;background:oklch(19% 0.035 290);padding:20px;display:flex;flex-direction:column;gap:16px;' },
     [headerRow, cardRefs.hue.root, cardRefs.sat.root, cardRefs.val.root]);
@@ -342,16 +346,16 @@ function buildShiftPanel() {
 function onCycleActiveConfig() {
   var configs = state.shiftConfigs;
   var current = state.activeConfig || 0;
-  if (current < configs.length - 1) { setState({ activeConfig: current + 1 }); return; }
-  if (configs.length < SHIFT_CONFIG_COUNT_MAX && countDefaultShiftConfigs(configs) <= 1) {
-    setState({ shiftConfigs: configs.concat([makeDefaultShiftConfig()]), activeConfig: configs.length });
-  } else {
-    setState({ activeConfig: 0 });
-  }
+  setState({ activeConfig: (current + 1) % configs.length });
+}
+function onAddConfig() {
+  var configs = state.shiftConfigs;
+  if (configs.length >= SHIFT_CONFIG_COUNT_MAX) return;
+  setState({ shiftConfigs: configs.concat([makeDefaultShiftConfig()]), activeConfig: configs.length });
 }
 function onDeleteActiveConfig() {
   var configs = state.shiftConfigs;
-  if (configs.length <= SHIFT_CONFIG_COUNT_INITIAL) return;
+  if (configs.length <= 1) return;
   var deletedIndex = state.activeConfig || 0;
   var newConfigs = configs.slice(0, deletedIndex).concat(configs.slice(deletedIndex + 1));
   var newColors = state.colors.map(function (c) {
@@ -370,8 +374,11 @@ function updateShiftPanel() {
     refs.activeDiceSvg.appendChild(svgEl('circle', { cx: pip.cx, cy: pip.cy, r: 2.4, fill: pip.color }));
   });
   refs.activeDiceBtn.title = 'Configuration ' + (activeConfigIndex + 1) + ' — click to switch which configuration these cards edit';
-  var canDelete = state.shiftConfigs.length > SHIFT_CONFIG_COUNT_INITIAL;
-  refs.deleteConfigBtn.style.cssText = (canDelete ? '' : STYLE_DISABLED) + 'margin-left:auto;';
+  var canAdd = state.shiftConfigs.length < SHIFT_CONFIG_COUNT_MAX;
+  refs.addConfigBtn.style.cssText = (canAdd ? '' : STYLE_DISABLED) + 'margin-left:auto;';
+  refs.addConfigBtn.title = 'Add a new configuration';
+  var canDelete = state.shiftConfigs.length > 1;
+  refs.deleteConfigBtn.style.cssText = canDelete ? '' : STYLE_DISABLED;
   refs.deleteConfigBtn.title = 'Delete Configuration ' + (activeConfigIndex + 1);
   cardRefs.hue.update();
   cardRefs.sat.update();
@@ -384,7 +391,7 @@ function updateShiftPanel() {
 function buildWheelPanel() {
   var title = h('div', {}, [
     h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'COLOR WHEEL'),
-    h('div', { className: 'pixel-text', style: 'font-size:15px;color:oklch(65% 0.02 290);margin-top:6px;' }, "Hue by angle, saturation by distance from center, value fixed at 100%. Drag a dot to retune that base color's hue/saturation."),
+    h('div', { className: 'pixel-text', style: 'font-size:13px;color:oklch(65% 0.02 290);margin-top:6px;' }, "Hue by angle, saturation by distance from center, value fixed at 100%. Drag a dot to retune that base color's hue/saturation."),
   ]);
   refs.wheelDisc = h('div', {
     className: 'wheel-disc',
@@ -449,7 +456,7 @@ function channelRow(labelText, min, max) {
   var rangeInput = h('input', { type: 'range', className: 'pixel-slider', min: String(min), max: String(max), step: '1' });
   var row = h('div', { className: 'channel-row' }, [
     h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline;' }, [
-      h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(60% 0.02 290);letter-spacing:1px;' }, labelText),
+      h('div', { className: 'pixel-text', style: 'font-size:11px;color:oklch(60% 0.02 290);letter-spacing:1px;' }, labelText),
       numberInput,
     ]),
     rangeInput,
@@ -489,9 +496,9 @@ function ensureColorRefs(id) {
   var lRow = channelRow('L', 0, 100), cRow = channelRow('C', 0, 100), ohRow = channelRow('H', 0, 360);
   var oklchPanel = h('div', { style: 'display:flex;flex-direction:column;gap:10px;' }, [lRow.row, cRow.row, ohRow.row]);
 
-  var hexInput = h('input', { type: 'text', className: 'value-input pixel-text', style: 'width:100%;height:32px;font-size:18px;text-align:left;' });
+  var hexInput = h('input', { type: 'text', className: 'value-input pixel-text', style: 'width:100%;height:32px;font-size:15px;text-align:left;' });
   var hexPanel = h('div', { className: 'channel-row' }, [
-    h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(60% 0.02 290);letter-spacing:1px;text-transform:uppercase;' }, 'Hex Code'),
+    h('div', { className: 'pixel-text', style: 'font-size:11px;color:oklch(60% 0.02 290);letter-spacing:1px;text-transform:uppercase;' }, 'Hex Code'),
     hexInput,
   ]);
 
@@ -514,8 +521,8 @@ function ensureColorRefs(id) {
 
   var swatchWrap = h('div', { style: 'position:relative;' }, [swatchBtn, popover]);
 
-  var displayLabel = h('div', { className: 'pixel-text', style: 'font-size:22px;color:oklch(92% 0.01 290);letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' });
-  var selectedLabel = h('div', { className: 'pixel-text', style: 'font-size:18px;color:oklch(80% 0.15 195);letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' });
+  var displayLabel = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(92% 0.01 290);letter-spacing:0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' });
+  var selectedLabel = h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' });
   var labelBlock = h('div', { style: 'display:flex;flex-direction:column;justify-content:center;gap:2px;flex:1;min-width:0;padding:4px 8px;cursor:pointer;' }, [displayLabel, selectedLabel]);
   labelBlock.addEventListener('click', onCycleColorDisplay);
 
@@ -731,7 +738,7 @@ function updateColorList() {
   });
   refs.colorList.style.cssText = state.compactRamps
     ? 'display:flex;flex-wrap:wrap;gap:0 2px;'
-    : 'display:grid;grid-template-columns:repeat(auto-fill, minmax(min(340px, 100%), 1fr));gap:20px;';
+    : 'display:grid;grid-template-columns:repeat(auto-fill, minmax(min(380px, 100%), 1fr));gap:20px;';
   refs.noColorsMsg.style.display = state.colors.length === 0 ? 'block' : 'none';
 }
 
@@ -796,7 +803,7 @@ function buildLeftColumn() {
   refs.colorIncBtn = h('div', { className: 'bevel-raised step-btn', style: STYLE_ACTIVE }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M7 4l7 6-7 6"></path></svg>'));
   var colorCountGroup = h('div', { style: 'display:flex;align-items:center;gap:4px;' }, [refs.colorDecBtn, refs.colorCountVal, refs.colorIncBtn]);
 
-  var sep = h('div', { className: 'pixel-text', style: 'font-size:18px;color:oklch(40% 0.02 290);' }, '|');
+  var sep = h('div', { className: 'pixel-text', style: 'font-size:15px;color:oklch(40% 0.02 290);' }, '|');
 
   var rampSizeLabel = h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'RAMP SIZE');
   refs.xDecBtn = h('div', { className: 'bevel-raised step-btn' }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M13 4l-7 6 7 6"></path></svg>'));
@@ -804,7 +811,7 @@ function buildLeftColumn() {
   refs.xIncBtn = h('div', { className: 'bevel-raised step-btn' }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M7 4l7 6-7 6"></path></svg>'));
   var xGroup = h('div', { style: 'display:flex;align-items:center;gap:4px;' }, [refs.xDecBtn, refs.xVal, refs.xIncBtn]);
 
-  refs.totalColorsText = h('div', { className: 'pixel-text', style: 'font-size:16px;color:oklch(80% 0.15 195);letter-spacing:1px;' });
+  refs.totalColorsText = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(80% 0.15 195);letter-spacing:1px;' });
 
   refs.compactInIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><polyline points="8,4 8,8 4,8"></polyline><polyline points="12,16 12,12 16,12"></polyline></svg>');
   refs.compactOutIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><polyline points="4,8 4,4 8,4"></polyline><polyline points="16,12 16,16 12,16"></polyline></svg>');
@@ -819,7 +826,7 @@ function buildLeftColumn() {
   var divider = h('div', { style: 'height:1px;background:oklch(30% 0.04 290);flex-shrink:0;margin-bottom:18px;' });
 
   refs.colorList = h('div', {});
-  refs.noColorsMsg = h('div', { className: 'pixel-text', style: 'font-size:16px;color:oklch(55% 0.02 290);padding:20px 0;text-align:center;' }, 'No base colors yet.');
+  refs.noColorsMsg = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(55% 0.02 290);padding:20px 0;text-align:center;' }, 'No base colors yet.');
   var colorListWrapper = h('div', { style: 'padding:5px;margin-bottom:16px;' }, [refs.colorList, refs.noColorsMsg]);
 
   panel.appendChild(controlsRow);
@@ -868,19 +875,19 @@ function buildShell() {
   root.id = 'app-root';
   root.addEventListener('click', onRootClick);
 
-  var LOGO_COLOR_MAP = { cyan: 'oklch(80% 0.15 195)', pink: 'oklch(75% 0.18 345)', cream: 'oklch(92% 0.01 290)' };
-  var logoGrid = h('div', { style: 'width:36px;height:36px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:2px;flex-shrink:0;' });
-  ['cyan', 'pink', 'cyan', 'pink', 'cream', 'pink', 'cyan', 'pink', 'cyan'].forEach(function (c) {
-    logoGrid.appendChild(h('div', { style: 'background:' + LOGO_COLOR_MAP[c] + ';' }));
+  var logoImg = h('img', {
+    src: 'assets/logo.png',
+    alt: 'Rampsmith logo',
+    style: 'width:48px;height:48px;flex-shrink:0;image-rendering:crisp-edges;image-rendering:pixelated;'
   });
   var titleBlock = h('div', {}, [
     h('div', { className: 'pixel-label', style: 'font-size:20px;color:oklch(80% 0.15 195);line-height:1;' }, 'RAMPSMITH'),
-    h('div', { className: 'pixel-text', style: 'font-size:15px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;margin-top:6px;' }, 'Pixel-Art Ramp Generator'),
+    h('div', { className: 'pixel-text', style: 'font-size:13px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;margin-top:6px;white-space:nowrap;' }, 'Pixel-Art Ramp Generator'),
   ]);
-  var headerLeft = h('div', { style: 'display:flex;align-items:center;gap:16px;' }, [logoGrid, titleBlock]);
+  var headerLeft = h('div', { style: 'display:flex;align-items:center;gap:16px;flex-shrink:0;' }, [logoImg, titleBlock]);
 
-  var shareLabel = h('div', { className: 'pixel-text', style: 'font-size:13px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;' }, 'Share Link — updates live');
-  refs.shareText = h('div', { className: 'bevel-well pixel-text', style: 'width:min(460px, 100%);flex:1;min-width:0;height:40px;display:flex;align-items:center;padding:0 12px;background:oklch(11% 0.025 290);color:oklch(92% 0.01 290);font-size:16px;overflow:hidden;white-space:nowrap;' });
+  var shareLabel = h('div', { className: 'pixel-text', style: 'font-size:11px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;' }, 'Share Link — updates live');
+  refs.shareText = h('div', { className: 'bevel-well pixel-text', style: 'width:min(460px, 100%);flex:1;min-width:0;height:40px;display:flex;align-items:center;padding:0 12px;background:oklch(11% 0.025 290);color:oklch(92% 0.01 290);font-size:14px;overflow:hidden;white-space:nowrap;' });
   refs.copyBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Copy share link' },
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><rect x="7" y="7" width="10" height="10"></rect><path d="M4 13V4a1 1 0 0 1 1-1h9"></path></svg>'));
   refs.copyBtn.addEventListener('click', onCopyShare);

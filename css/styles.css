@@ -17,7 +17,7 @@ a:hover { color: oklch(88% 0.13 195); }
   letter-spacing: 0.5px;
 }
 .pixel-text {
-  font-family: "VT323", "Courier New", monospace;
+  font-family: "Share Tech Mono", "Courier New", monospace;
 }
 .bevel-raised {
   border: 3px solid oklch(9% 0.02 290);
@@ -41,7 +41,7 @@ a:hover { color: oklch(88% 0.13 195); }
 }
 .tab-btn {
   padding: 6px 14px;
-  font-size: 15px;
+  font-size: 13px;
   letter-spacing: 1px;
   cursor: pointer;
 }
@@ -183,6 +183,8 @@ a:hover { color: oklch(88% 0.13 195); }
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
+  background: oklch(24% 0.035 290);
+  color: oklch(80% 0.15 195);
 }
 .pixel-slider {
   -webkit-appearance: none;
@@ -267,7 +269,7 @@ body::-webkit-scrollbar-thumb:hover {
   box-shadow: inset 2px 2px 0 0 oklch(9% 0.02 290), inset -2px -2px 0 0 oklch(30% 0.04 290);
   background: oklch(11% 0.025 290);
   color: oklch(92% 0.01 290);
-  font-size: 16px;
+  font-size: 14px;
   text-align: center;
   padding: 0 4px;
 }
@@ -284,7 +286,8 @@ body::-webkit-scrollbar-thumb:hover {
   min-height: 920px;
   margin: 0 auto;
   background: oklch(15% 0.03 290);
-  font-family: 'VT323', monospace;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
   display: flex;
   flex-direction: column;
 }
@@ -318,7 +321,9 @@ body::-webkit-scrollbar-thumb:hover {
   gap: 10px;
 }
 .pf-header-right {
-  align-items: flex-end;
+  align-items: stretch;
+  max-width: 460px;
+  min-width: 0;
 }
 
 /* ==== Responsive pass ====
@@ -332,7 +337,7 @@ body::-webkit-scrollbar-thumb:hover {
   #app-root { min-height: 0; }
   .pf-content { flex-direction: column; padding: 20px 16px 28px; gap: 20px; }
   .pf-left-col { min-width: 0; }
-  .pf-right-col { width: 100%; }
+  .pf-right-col { width: 460px; max-width: 100%; margin: 0 auto; }
   .pf-header {
     height: auto;
     flex-direction: column;
@@ -340,7 +345,7 @@ body::-webkit-scrollbar-thumb:hover {
     gap: 14px;
     padding: 16px;
   }
-  .pf-header-right { align-items: stretch; }
+  .pf-header-right { align-items: stretch; max-width: none; }
 }
 
 @media (max-width: 640px) {

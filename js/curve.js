@@ -242,16 +242,6 @@ function makeDefaultShiftConfigs(n) {
   for (var i = 0; i < n; i++) configs.push(makeDefaultShiftConfig());
   return configs;
 }
-function isDefaultShiftConfig(cfg) {
-  return JSON.stringify(cfg.hue) === JSON.stringify(defaultComponent('hue')) &&
-    JSON.stringify(cfg.sat) === JSON.stringify(defaultComponent('sat')) &&
-    JSON.stringify(cfg.val) === JSON.stringify(defaultComponent('val'));
-}
-function countDefaultShiftConfigs(configs) {
-  var n = 0;
-  for (var i = 0; i < configs.length; i++) if (isDefaultShiftConfig(configs[i])) n++;
-  return n;
-}
 
 // Dice-face icon for each of the 6 configurations.
 var DICE_COLORS = [

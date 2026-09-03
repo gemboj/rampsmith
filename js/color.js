@@ -41,11 +41,11 @@ function roundedHsvFromHex(hex) {
 function formatColorDisplay(hex, mode) {
   if (mode === 'hsv') {
     var hsv = roundedHsvFromHex(hex);
-    return 'H:' + hsv.h + '° S:' + hsv.s + '% V:' + hsv.v + '%';
+    return 'H:' + hsv.h + ' S:' + hsv.s + ' V:' + hsv.v;
   }
   if (mode === 'oklch') {
     var f = deriveColorFields(hex);
-    return 'L:' + f.oklchL + '% C:' + f.oklchC + '% H:' + f.oklchH + '°';
+    return 'L:' + f.oklchL + ' C:' + f.oklchC + ' H:' + f.oklchH;
   }
   return hex.toUpperCase();
 }

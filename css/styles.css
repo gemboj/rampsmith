@@ -1,0 +1,359 @@
+/* Palette Forge - ported from mockup/Main.dc.html's own <style> block.
+   Desktop layout first (parity pass); responsive rules added in a later
+   pass - see [[verify-mockup-layout-fits]], [[single-global-scrollbar]]. */
+
+* { box-sizing: border-box; }
+
+/* No internal scrollbars anywhere in this app - html/body are the ONE
+   place that scrolls, as a single global scrollbar. See
+   [[single-global-scrollbar]]. */
+html, body { margin: 0; padding: 0; overflow-y: auto; overflow-x: hidden; background: oklch(15% 0.03 290); }
+
+a { color: oklch(80% 0.15 195); }
+a:hover { color: oklch(88% 0.13 195); }
+
+.pixel-label {
+  font-family: "Press Start 2P", "Courier New", monospace;
+  letter-spacing: 0.5px;
+}
+.pixel-text {
+  font-family: "VT323", "Courier New", monospace;
+}
+.bevel-raised {
+  border: 3px solid oklch(9% 0.02 290);
+  box-shadow: inset 2px 2px 0 0 oklch(38% 0.045 290);
+}
+.bevel-well {
+  border: 3px solid oklch(9% 0.02 290);
+  box-shadow: inset 2px 2px 0 0 oklch(9% 0.02 290), inset -2px -2px 0 0 oklch(30% 0.04 290);
+}
+.tab-active {
+  background: oklch(80% 0.15 195);
+  color: oklch(14% 0.03 290);
+  border: 3px solid oklch(9% 0.02 290);
+  box-shadow: inset -2px -2px 0 0 oklch(60% 0.13 195);
+}
+.tab-inactive {
+  background: oklch(24% 0.035 290);
+  color: oklch(65% 0.02 290);
+  border: 3px solid oklch(9% 0.02 290);
+  box-shadow: inset 2px 2px 0 0 oklch(32% 0.04 290);
+}
+.tab-btn {
+  padding: 6px 14px;
+  font-size: 15px;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+.step-btn {
+  width: 26px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: oklch(24% 0.035 290);
+  color: oklch(80% 0.15 195);
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.step-val {
+  min-width: 68px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: oklch(24% 0.035 290);
+  color: oklch(92% 0.01 290);
+  flex-shrink: 0;
+}
+.ramp-swatch {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.ramp-swatch-center {
+  width: 42px;
+  height: 42px;
+}
+.hsv-swatch {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.remove-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: oklch(24% 0.035 290);
+  color: oklch(75% 0.18 345);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.action-btn {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: oklch(24% 0.035 290);
+  color: oklch(75% 0.18 345);
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.color-input {
+  padding: 0;
+  cursor: pointer;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.popover {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  width: 260px;
+  z-index: 30;
+  background: oklch(19% 0.035 290);
+  border: 3px solid oklch(9% 0.02 290);
+  box-shadow: inset 2px 2px 0 0 oklch(38% 0.045 290), 6px 6px 0 0 oklch(9% 0.02 290);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: default;
+}
+.info-btn {
+  position: relative;
+}
+.info-popover {
+  display: none;
+  position: absolute;
+  top: 28px;
+  left: -12px;
+  width: 280px;
+  z-index: 30;
+  background: oklch(19% 0.035 290);
+  border: 3px solid oklch(9% 0.02 290);
+  box-shadow: inset 2px 2px 0 0 oklch(38% 0.045 290), 6px 6px 0 0 oklch(9% 0.02 290);
+  padding: 14px;
+  flex-direction: column;
+  gap: 12px;
+  cursor: default;
+}
+.info-btn:hover .info-popover {
+  display: flex;
+}
+.mode-tab {
+  flex: 1;
+  text-align: center;
+}
+.channel-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.eyedropper-wrap {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+.eyedropper-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+}
+.copy-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.pixel-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  background: oklch(11% 0.025 290);
+  border: 3px solid oklch(9% 0.02 290);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pixel-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 20px;
+  background: oklch(80% 0.15 195);
+  border: 2px solid oklch(9% 0.02 290);
+  cursor: pointer;
+}
+.pixel-slider::-moz-range-thumb {
+  width: 14px;
+  height: 20px;
+  background: oklch(80% 0.15 195);
+  border: 2px solid oklch(9% 0.02 290);
+  border-radius: 0;
+  cursor: pointer;
+}
+.pixel-slider::-moz-range-track {
+  height: 12px;
+  background: oklch(11% 0.025 290);
+}
+.curve-handle-hit {
+  cursor: grab;
+  touch-action: none;
+}
+.curve-handle-hit:active {
+  cursor: grabbing;
+}
+.curve-plot {
+  user-select: none;
+  -webkit-user-select: none;
+  border-color: oklch(20% 0.035 290);
+  box-shadow: inset 2px 2px 0 0 oklch(20% 0.035 290), inset -2px -2px 0 0 oklch(30% 0.04 290);
+}
+.wheel-dot-hit {
+  cursor: grab;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wheel-dot-hit:active {
+  cursor: grabbing;
+}
+body {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(80% 0.15 195) oklch(11% 0.025 290);
+}
+body::-webkit-scrollbar {
+  width: 14px;
+}
+body::-webkit-scrollbar-track {
+  background: oklch(11% 0.025 290);
+  border: 3px solid oklch(9% 0.02 290);
+  border-radius: 0;
+}
+body::-webkit-scrollbar-thumb {
+  background: oklch(80% 0.15 195);
+  border: 3px solid oklch(9% 0.02 290);
+  border-radius: 0;
+}
+body::-webkit-scrollbar-thumb:hover {
+  background: oklch(88% 0.13 195);
+}
+.value-input {
+  -webkit-appearance: none;
+  appearance: none;
+  -moz-appearance: textfield;
+  width: 56px;
+  height: 26px;
+  border: 3px solid oklch(9% 0.02 290);
+  box-shadow: inset 2px 2px 0 0 oklch(9% 0.02 290), inset -2px -2px 0 0 oklch(30% 0.04 290);
+  background: oklch(11% 0.025 290);
+  color: oklch(92% 0.01 290);
+  font-size: 16px;
+  text-align: center;
+  padding: 0 4px;
+}
+.value-input::-webkit-inner-spin-button,
+.value-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ==== App shell (was inline styles in the mockup's root artboard div) ==== */
+#app-root {
+  width: 100%;
+  max-width: 1440px;
+  min-height: 920px;
+  margin: 0 auto;
+  background: oklch(15% 0.03 290);
+  font-family: 'VT323', monospace;
+  display: flex;
+  flex-direction: column;
+}
+.pf-header {
+  height: 84px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  border-bottom: 4px solid oklch(9% 0.02 290);
+}
+.pf-content {
+  flex: 1;
+  display: flex;
+  gap: 24px;
+  padding: 24px 32px 32px;
+}
+.pf-left-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.pf-right-col {
+  width: 460px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pf-header-right {
+  align-items: flex-end;
+}
+
+/* ==== Responsive pass ====
+   Desktop layout (above) is unchanged; below these breakpoints the same
+   panels reflow to a single column instead of a separate mobile design -
+   see project decision to use one responsive layout, not two. Verified at
+   375/768/1440px with headless Chromium, per [[verify-mockup-layout-fits]].
+   Still exactly one scrollbar (html/body) at every width - see
+   [[single-global-scrollbar]] - nothing here adds overflow to a panel. */
+@media (max-width: 1023px) {
+  #app-root { min-height: 0; }
+  .pf-content { flex-direction: column; padding: 20px 16px 28px; gap: 20px; }
+  .pf-left-col { min-width: 0; }
+  .pf-right-col { width: 100%; }
+  .pf-header {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 16px;
+  }
+  .pf-header-right { align-items: stretch; }
+}
+
+@media (max-width: 640px) {
+  .pf-content { padding: 16px 10px 24px; gap: 16px; }
+  .ramp-swatch { width: 28px; height: 28px; }
+  .ramp-swatch-center { width: 34px; height: 34px; }
+  .pixel-label { font-size: clamp(11px, 3.2vw, 14px); }
+}
+
+/* Touch target sizing: same visual icon, more room to tap - matches the
+   curve editor's own hidden-hit-circle-bigger-than-its-dot convention. */
+@media (pointer: coarse) {
+  .step-btn { width: 40px; height: 40px; }
+  .remove-btn, .color-input { min-width: 44px; min-height: 44px; }
+  .action-btn { width: 44px; height: 44px; }
+}

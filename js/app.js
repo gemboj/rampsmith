@@ -1080,16 +1080,17 @@ function buildStepper(minWidth) {
 // mobile burger menu, mobile Settings tab), and since a DOM node can only
 // live in one place, each surface gets its own instance; all instances are
 // kept in module-level arrays so a single state change updates every copy.
+function addColor() {
+  var hex = PRESET_HUES[state.nextId % PRESET_HUES.length];
+  setState({ colors: state.colors.concat([makeColorEntry(state.nextId, hex)]), nextId: state.nextId + 1 });
+}
 function makeColorCountStepper() {
   var s = buildStepper(40);
   s.dec.addEventListener('click', function () {
     if (state.colors.length === 0) return;
     setState({ colors: state.colors.slice(0, -1) });
   });
-  s.inc.addEventListener('click', function () {
-    var hex = PRESET_HUES[state.nextId % PRESET_HUES.length];
-    setState({ colors: state.colors.concat([makeColorEntry(state.nextId, hex)]), nextId: state.nextId + 1 });
-  });
+  s.inc.addEventListener('click', addColor);
   colorCountSteppers.push(s);
   return s;
 }
@@ -1163,10 +1164,23 @@ function buildColorsPanel() {
   refs.noColorsMsg = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(55% 0.02 290);padding:20px 0;text-align:center;' }, 'No base colors yet.');
   var colorListWrapper = h('div', { className: 'colors-scroll' }, [refs.colorList, refs.noColorsMsg]);
 
+  // Sits as a sibling AFTER colorListWrapper (not inside it), so on desktop -
+  // where .colors-scroll is the one part of the page that scrolls internally
+  // (see [[single-page-no-scroll]]) - it stays pinned below the list instead
+  // of scrolling away with it. On mobile, where .colors-scroll doesn't scroll
+  // internally, it just naturally lands right after the last ramp.
+  var addColorIcon = svgFromMarkup('<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M10 4v12M4 10h12"></path></svg>');
+  var addColorBtn = h('div', {
+    className: 'bevel-raised add-color-btn',
+    style: 'display:flex;align-items:center;justify-content:center;gap:8px;height:44px;margin-top:14px;flex-shrink:0;cursor:pointer;color:oklch(80% 0.15 195);user-select:none;',
+  }, [addColorIcon, h('div', { className: 'pixel-label', style: 'font-size:13px;letter-spacing:1px;' }, 'ADD COLOR')]);
+  addColorBtn.addEventListener('click', addColor);
+
   panel.appendChild(desktopControlsRow);
   panel.appendChild(mobileControlsRow);
   panel.appendChild(divider);
   panel.appendChild(colorListWrapper);
+  panel.appendChild(addColorBtn);
   col.appendChild(panel);
 
   return col;

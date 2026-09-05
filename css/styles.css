@@ -611,12 +611,12 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
   /* Same problem as .info-popover above: absolutely positioned off the
      swatch button at a fixed 260px width/z-index 30, which both overflows
      a phone viewport and renders underneath .mobile-nav (z-index 40).
-     Anchor to the viewport instead, above the nav bar. */
+     Anchor to the viewport instead of the button so it can never get cut off
+     or hide under the nav bar - top/left/transform are then set inline by
+     positionMobilePopover() per tap, anchored near whichever swatch opened
+     it (a static top/left here would fight with that on every reflow). */
   .popover {
     position: fixed;
-    left: 50%;
-    top: 90px;
-    transform: translateX(-50%);
     width: min(280px, calc(100vw - 32px));
     max-height: calc(100vh - 160px);
     overflow-y: auto;

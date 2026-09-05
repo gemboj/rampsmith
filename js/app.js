@@ -714,6 +714,50 @@ function onHexDraftChange(id, v) {
     return next;
   }) });
 }
+// The desktop popover just sits absolutely positioned off swatchWrap (see
+// .popover) - fine there since the list never overlaps the header. Mobile
+// used to pin it to a fixed spot near the top of the screen regardless of
+// which color's swatch was tapped (to dodge .mobile-nav, which sits above it
+// in z-index); instead, anchor it to the actual button that was tapped, but
+// still clamp it so it can never render under the nav bar or spill off
+// either edge - including for the last color in the list, near the bottom.
+function positionMobilePopover(popover, anchorBtn) {
+  if (window.innerWidth > 1023) {
+    popover.style.top = ''; popover.style.left = ''; popover.style.transform = '';
+    return;
+  }
+  var margin = 10;
+  var navBar = document.querySelector('.mobile-nav');
+  var navTop = navBar ? navBar.getBoundingClientRect().top : window.innerHeight;
+  var btnRect = anchorBtn.getBoundingClientRect();
+  var popRect = popover.getBoundingClientRect();
+  var maxBottom = navTop - margin;
+
+  var top = btnRect.bottom + 8; // prefer just below the button
+  if (top + popRect.height > maxBottom) top = btnRect.top - popRect.height - 8; // flip above if it doesn't fit below
+  top = Math.max(margin, Math.min(top, maxBottom - popRect.height));
+
+  var left = btnRect.left + btnRect.width / 2 - popRect.width / 2; // centered on the button
+  left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));
+
+  popover.style.top = top + 'px';
+  popover.style.left = left + 'px';
+  popover.style.transform = 'none';
+}
+// The popover is position:fixed on mobile (viewport-relative, so it can sit
+// above the nav bar regardless of where its swatch scrolls to), which means
+// it does NOT track the page scrolling underneath it on its own - reposition
+// on every scroll/resize while any picker is open so it stays anchored to its
+// button instead of visually drifting away from it.
+function repositionOpenMobilePopovers() {
+  state.colors.forEach(function (c) {
+    if (!c.pickerOpen) return;
+    var r = colorRefs.get(c.id);
+    if (r) positionMobilePopover(r.popover, r.swatchBtn);
+  });
+}
+window.addEventListener('scroll', repositionOpenMobilePopovers, true);
+window.addEventListener('resize', repositionOpenMobilePopovers);
 function onTogglePicker(id, e) {
   e.stopPropagation();
   setState({
@@ -801,6 +845,7 @@ function updateColorItem(id) {
 
   r.swatchBtn.style.background = c.hex;
   r.popover.style.display = c.pickerOpen ? 'flex' : 'none';
+  if (c.pickerOpen) positionMobilePopover(r.popover, r.swatchBtn);
   r.actionsMenu.style.display = c.actionsOpen ? 'flex' : '';
   if (document.activeElement !== r.eyedropperInput) r.eyedropperInput.value = c.hex;
 

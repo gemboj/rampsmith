@@ -55,6 +55,11 @@ var wheelRefs = new Map();
 var lastAnchorClickAt = {};
 var copyTimer = null;
 var colorCopyTimer = null;
+var colorCountSteppers = [];
+var rampSizeSteppers = [];
+var compactToggleInstances = [];
+var sortBtnInstances = [];
+var totalColorsTexts = [];
 
 var WHEEL_SIZE = 380, WHEEL_MARKER_R = 7, WHEEL_HIT_R = 13;
 var wheelCx = WHEEL_SIZE / 2, wheelCy = WHEEL_SIZE / 2;
@@ -345,8 +350,60 @@ function buildShiftPanel() {
   cardRefs.hue = buildCard('hue', 'HUE', 'background: linear-gradient(90deg, red, yellow, lime, cyan, blue, magenta, red);', 'oklch(80% 0.15 195)', false);
   cardRefs.sat = buildCard('sat', 'CHROMA', 'background: linear-gradient(90deg, oklch(55% 0 0), oklch(75% 0.18 345));', 'oklch(75% 0.18 345)', true);
   cardRefs.val = buildCard('val', 'LIGHTNESS', 'background: linear-gradient(90deg, #000000, #ffffff);', 'oklch(85% 0.17 95)', true);
-
   return h('div', { className: 'curve-card-row' }, [cardRefs.hue.root, cardRefs.sat.root, cardRefs.val.root]);
+}
+
+// ---------------------------------------------------------------------------
+// Mobile-only: pins one base color's ramp above (outside) the bottom-panel
+// box on the Shift Settings tab, sticky-positioned so it stays visible while
+// scrolling through the curve cards. A left/right swipe (Pointer Events, so
+// touch/mouse/pen all just work) steps state.previewIndex through
+// state.colors - no separate prev/next buttons needed.
+// ---------------------------------------------------------------------------
+function buildMobileShiftPreview() {
+  refs.shiftPreviewRow = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;' });
+  refs.shiftPreviewWrap = h('div', { className: 'mobile-shift-preview' }, [refs.shiftPreviewRow]);
+
+  var previewSwipeStartX = null;
+  refs.shiftPreviewWrap.addEventListener('pointerdown', function (e) { previewSwipeStartX = e.clientX; });
+  refs.shiftPreviewWrap.addEventListener('pointerup', function (e) {
+    if (previewSwipeStartX == null) return;
+    var dx = e.clientX - previewSwipeStartX;
+    previewSwipeStartX = null;
+    if (Math.abs(dx) < 40) return;
+    if (dx < 0) onPreviewNext(); else onPreviewPrev();
+  });
+
+  return refs.shiftPreviewWrap;
+}
+
+function onPreviewPrev() {
+  var len = state.colors.length;
+  if (len === 0) return;
+  setState({ previewIndex: ((state.previewIndex || 0) - 1 + len) % len });
+}
+function onPreviewNext() {
+  var len = state.colors.length;
+  if (len === 0) return;
+  setState({ previewIndex: ((state.previewIndex || 0) + 1) % len });
+}
+
+function updateShiftPreview() {
+  var colors = state.colors;
+  var hasColors = colors.length > 0;
+  refs.shiftPreviewWrap.style.display = hasColors ? '' : 'none';
+  if (!hasColors) return;
+  var idx = clamp(state.previewIndex || 0, 0, colors.length - 1);
+  var c = colors[idx];
+  refs.shiftPreviewRow.innerHTML = '';
+  var cfg = state.shiftConfigs[c.configIndex || 0];
+  var ramp = genRamp(c.hex, state.X, cfg.hue, cfg.sat, cfg.val);
+  ramp.forEach(function (hexColor, i) {
+    var sw = document.createElement('div');
+    sw.className = i === state.X ? 'ramp-swatch ramp-swatch-center' : 'ramp-swatch';
+    sw.style.background = hexColor;
+    refs.shiftPreviewRow.appendChild(sw);
+  });
 }
 
 function onCycleActiveConfig() {
@@ -386,9 +443,11 @@ function updateShiftPanel() {
   var canDelete = state.shiftConfigs.length > 1;
   refs.deleteConfigBtn.style.cssText = canDelete ? '' : STYLE_DISABLED;
   refs.deleteConfigBtn.title = 'Delete Configuration ' + (activeConfigIndex + 1);
+  refs.infoPopover.style.display = state.infoOpen ? 'flex' : '';
   cardRefs.hue.update();
   cardRefs.sat.update();
   cardRefs.val.update();
+  updateShiftPreview();
 }
 
 // ---------------------------------------------------------------------------
@@ -396,11 +455,9 @@ function updateShiftPanel() {
 // says that; just a short caption and the disc itself.
 // ---------------------------------------------------------------------------
 function buildWheelPanel() {
-  var caption = h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(65% 0.02 290);text-align:center;max-width:420px;flex-shrink:0;' },
-    "Hue by angle, saturation by distance from center, value fixed at 100%. Drag a dot to retune that base color's hue/saturation.");
   refs.wheelDisc = h('div', { className: 'wheel-disc' });
   var discWrap = h('div', { className: 'wheel-disc-wrap' }, refs.wheelDisc);
-  return h('div', { className: 'wheel-panel-root' }, [caption, discWrap]);
+  return h('div', { className: 'wheel-panel-root' }, [discWrap]);
 }
 
 function ensureWheelMarker(id) {
@@ -543,7 +600,15 @@ function ensureColorRefs(id) {
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M4 4l12 12M16 4L4 16"></path></svg>'));
   removeBtn.addEventListener('click', function () { onRemoveColor(id); });
 
-  var rightGroup = h('div', { style: 'display:flex;align-items:center;gap:6px;flex-shrink:0;' }, [diceBtn, copyIcon, removeBtn]);
+  // On mobile the dice/copy/remove trio collapses behind a per-item kebab
+  // button (see .color-kebab-btn / .color-actions-menu); on desktop that
+  // CSS just renders actionsMenu as the plain inline row it always was.
+  var actionsMenu = h('div', { className: 'color-actions-menu' }, [diceBtn, copyIcon, removeBtn]);
+  actionsMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+  var kebabBtn = h('div', { className: 'bevel-raised action-btn color-kebab-btn' },
+    svgFromMarkup('<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="4" r="1.8"></circle><circle cx="10" cy="10" r="1.8"></circle><circle cx="10" cy="16" r="1.8"></circle></svg>'));
+  kebabBtn.addEventListener('click', function (e) { onToggleActionsMenu(id, e); });
+  var rightGroup = h('div', { className: 'color-actions-wrap' }, [kebabBtn, actionsMenu]);
   var detailsRow = h('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:8px;' }, [leftGroup, rightGroup]);
 
   var itemRoot = h('div', {}, [rampRow, detailsRow]);
@@ -557,6 +622,7 @@ function ensureColorRefs(id) {
     hexInput: hexInput, eyedropperInput: eyedropperInput,
     displayLabel: displayLabel, selectedLabel: selectedLabel,
     diceSvg: diceSvg, diceBtn: diceBtn, copyIcon: copyIcon,
+    actionsMenu: actionsMenu,
   };
   colorRefs.set(id, refsObj);
   return refsObj;
@@ -628,6 +694,15 @@ function onTogglePicker(id, e) {
 function onClosePicker(id) {
   setState({ colors: state.colors.map(function (x) { return x.id === id ? Object.assign({}, x, { pickerOpen: false }) : x; }) });
 }
+function onToggleActionsMenu(id, e) {
+  e.stopPropagation();
+  setState({
+    colors: state.colors.map(function (x) {
+      if (x.id === id) return Object.assign({}, x, { actionsOpen: !x.actionsOpen });
+      return x.actionsOpen ? Object.assign({}, x, { actionsOpen: false }) : x;
+    }),
+  });
+}
 function onCopyHex(id) {
   var c = getColor(id);
   try { navigator.clipboard.writeText(c.hex); } catch (e) {}
@@ -668,7 +743,7 @@ function updateColorItem(id) {
   r.root.style.cssText = isCompact
     ? 'display:flex;flex-direction:column;gap:4px;'
     : 'display:flex;flex-direction:column;gap:8px;padding-bottom:16px;border-bottom:1px solid oklch(30% 0.04 290);';
-  r.rampRow.style.cssText = 'display:flex;align-items:center;gap:' + (isCompact ? '2px' : '7px') + ';';
+  r.rampRow.style.cssText = 'display:flex;align-items:center;gap:' + (isCompact ? '0' : '7px') + ';';
 
   r.rampRow.innerHTML = '';
   ramp.forEach(function (hexColor, i) {
@@ -694,6 +769,7 @@ function updateColorItem(id) {
 
   r.swatchBtn.style.background = c.hex;
   r.popover.style.display = c.pickerOpen ? 'flex' : 'none';
+  r.actionsMenu.style.display = c.actionsOpen ? 'flex' : '';
   if (document.activeElement !== r.eyedropperInput) r.eyedropperInput.value = c.hex;
 
   var mode = c.pickerMode || 'hsv';
@@ -740,7 +816,7 @@ function updateColorList() {
     updateColorItem(id);
   });
   refs.colorList.style.cssText = state.compactRamps
-    ? 'display:flex;flex-wrap:wrap;gap:0 2px;'
+    ? 'display:flex;flex-wrap:wrap;gap:0;'
     : 'display:grid;grid-template-columns:repeat(auto-fill, minmax(min(380px, 100%), 1fr));gap:20px;';
   refs.noColorsMsg.style.display = state.colors.length === 0 ? 'block' : 'none';
 }
@@ -749,16 +825,34 @@ function updateColorList() {
 // Base colors panel header controls + right-column tabs + header share box.
 // ---------------------------------------------------------------------------
 function updateBaseColorsHeader() {
-  refs.colorCountVal.textContent = String(state.colors.length);
-  refs.colorDecBtn.style.cssText = state.colors.length === 0 ? STYLE_DISABLED : STYLE_ACTIVE;
-  refs.xVal.textContent = String(state.X);
-  refs.xDecBtn.style.cssText = state.X <= 1 ? STYLE_DISABLED : STYLE_ACTIVE;
-  refs.xIncBtn.style.cssText = state.X >= 4 ? STYLE_DISABLED : STYLE_ACTIVE;
-  refs.totalColorsText.textContent = '→ ' + (2 * state.X + 1) + ' COLORS PER RAMP';
+  var colorDecStyle = state.colors.length === 0 ? STYLE_DISABLED : STYLE_ACTIVE;
+  colorCountSteppers.forEach(function (s) {
+    s.val.textContent = String(state.colors.length);
+    s.dec.style.cssText = colorDecStyle;
+  });
+  var xDecStyle = state.X <= 1 ? STYLE_DISABLED : STYLE_ACTIVE;
+  var xIncStyle = state.X >= 4 ? STYLE_DISABLED : STYLE_ACTIVE;
+  rampSizeSteppers.forEach(function (s) {
+    s.val.textContent = String(state.X);
+    s.dec.style.cssText = xDecStyle;
+    s.inc.style.cssText = xIncStyle;
+  });
+  var totalText = '→ ' + (2 * state.X + 1) + ' COLORS PER RAMP';
+  totalColorsTexts.forEach(function (el) { el.textContent = totalText; });
   var isCompact = !!state.compactRamps;
-  refs.compactInIcon.style.display = isCompact ? 'none' : '';
-  refs.compactOutIcon.style.display = isCompact ? '' : 'none';
-  refs.compactToggleBtn.title = isCompact ? 'Show base color details' : 'Compact view (ramps only)';
+  compactToggleInstances.forEach(function (inst) {
+    inst.inIcon.style.display = isCompact ? 'none' : '';
+    inst.outIcon.style.display = isCompact ? '' : 'none';
+    inst.btn.title = isCompact ? 'Show base color details' : 'Compact view (ramps only)';
+  });
+}
+
+function updateMobileNav() {
+  var active = state.mobileTab || 'ramps';
+  Object.keys(refs.mobileNavBtns).forEach(function (key) {
+    refs.mobileNavBtns[key].className = 'mobile-nav-btn' + (key === active ? ' mobile-nav-btn-active' : '');
+  });
+  refs.pfContent.setAttribute('data-mobile-tab', active);
 }
 
 function updateRightTabs() {
@@ -789,43 +883,99 @@ function onRootClick() {
   var patch = {};
   if (state.selectedAnchor !== null) patch.selectedAnchor = null;
   if (state.selectedStep !== null && state.selectedStep !== undefined) patch.selectedStep = null;
-  var anyOpen = state.colors.some(function (c) { return c.pickerOpen; });
-  if (anyOpen) patch.colors = state.colors.map(function (c) { return c.pickerOpen ? Object.assign({}, c, { pickerOpen: false }) : c; });
+  if (state.infoOpen) patch.infoOpen = false;
+  var anyOpen = state.colors.some(function (c) { return c.pickerOpen || c.actionsOpen; });
+  if (anyOpen) patch.colors = state.colors.map(function (c) {
+    return (c.pickerOpen || c.actionsOpen) ? Object.assign({}, c, { pickerOpen: false, actionsOpen: false }) : c;
+  });
   if (Object.keys(patch).length) setState(patch);
 }
 
 // ---------------------------------------------------------------------------
 // Shell assembly.
 // ---------------------------------------------------------------------------
+function buildStepper(minWidth) {
+  var dec = h('div', { className: 'bevel-raised step-btn' }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M13 4l-7 6 7 6"></path></svg>'));
+  var val = h('div', { className: 'bevel-well step-val pixel-text', style: 'min-width:' + minWidth + 'px;' });
+  var inc = h('div', { className: 'bevel-raised step-btn', style: STYLE_ACTIVE }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M7 4l7 6-7 6"></path></svg>'));
+  var root = h('div', { style: 'display:flex;align-items:center;gap:4px;' }, [dec, val, inc]);
+  return { root: root, dec: dec, val: val, inc: inc };
+}
+// Each of these factories creates a fresh, independently-wired instance -
+// the same stepper/toggle appears in up to three places (desktop header,
+// mobile burger menu, mobile Settings tab), and since a DOM node can only
+// live in one place, each surface gets its own instance; all instances are
+// kept in module-level arrays so a single state change updates every copy.
+function makeColorCountStepper() {
+  var s = buildStepper(40);
+  s.dec.addEventListener('click', function () {
+    if (state.colors.length === 0) return;
+    setState({ colors: state.colors.slice(0, -1) });
+  });
+  s.inc.addEventListener('click', function () {
+    var hex = PRESET_HUES[state.nextId % PRESET_HUES.length];
+    setState({ colors: state.colors.concat([makeColorEntry(state.nextId, hex)]), nextId: state.nextId + 1 });
+  });
+  colorCountSteppers.push(s);
+  return s;
+}
+function makeRampSizeStepper() {
+  var s = buildStepper(50);
+  s.dec.addEventListener('click', function () { if (state.X > 1) setState({ X: state.X - 1 }); });
+  s.inc.addEventListener('click', function () { if (state.X < 4) setState({ X: state.X + 1 }); });
+  rampSizeSteppers.push(s);
+  return s;
+}
+function makeTotalColorsText() {
+  var el = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(80% 0.15 195);letter-spacing:1px;' });
+  totalColorsTexts.push(el);
+  return el;
+}
+function makeCompactToggleBtn() {
+  var inIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><polyline points="8,4 8,8 4,8"></polyline><polyline points="12,16 12,12 16,12"></polyline></svg>');
+  var outIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><polyline points="4,8 4,4 8,4"></polyline><polyline points="16,12 16,16 12,16"></polyline></svg>');
+  var btn = h('div', { className: 'bevel-raised action-btn', style: 'color: oklch(80% 0.15 195);' }, [inIcon, outIcon]);
+  btn.addEventListener('click', function () { setState({ compactRamps: !state.compactRamps }); });
+  var instance = { btn: btn, inIcon: inIcon, outIcon: outIcon };
+  compactToggleInstances.push(instance);
+  return instance;
+}
+function makeSortBtn() {
+  var btn = h('div', { className: 'bevel-raised action-btn', style: 'color: oklch(80% 0.15 195);', title: 'Sort base colors by hue' },
+    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><line x1="4" y1="5" x2="10" y2="5"></line><line x1="4" y1="10" x2="14" y2="10"></line><line x1="4" y1="15" x2="18" y2="15"></line></svg>'));
+  btn.addEventListener('click', function () {
+    setState({ colors: state.colors.slice().sort(function (a, b) { return (a.hsvH || 0) - (b.hsvH || 0); }) });
+  });
+  sortBtnInstances.push(btn);
+  return btn;
+}
+
 function buildColorsPanel() {
   var col = h('div', { className: 'colors-panel' });
   var panel = h('div', { className: 'bevel-raised', style: 'flex:1;min-width:0;min-height:0;background:oklch(19% 0.035 290);padding:20px;display:flex;flex-direction:column;' });
 
+  // ---- Desktop controls row (hidden on mobile - see .desktop-controls-row) ----
   var baseColorsLabel = h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'BASE COLORS');
-  refs.colorDecBtn = h('div', { className: 'bevel-raised step-btn' }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M13 4l-7 6 7 6"></path></svg>'));
-  refs.colorCountVal = h('div', { className: 'bevel-raised step-val pixel-text', style: 'min-width:40px;' });
-  refs.colorIncBtn = h('div', { className: 'bevel-raised step-btn', style: STYLE_ACTIVE }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M7 4l7 6-7 6"></path></svg>'));
-  var colorCountGroup = h('div', { style: 'display:flex;align-items:center;gap:4px;' }, [refs.colorDecBtn, refs.colorCountVal, refs.colorIncBtn]);
-
+  var colorCountStepper = makeColorCountStepper();
   var sep = h('div', { className: 'pixel-text', style: 'font-size:15px;color:oklch(40% 0.02 290);' }, '|');
-
   var rampSizeLabel = h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'RAMP SIZE');
-  refs.xDecBtn = h('div', { className: 'bevel-raised step-btn' }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M13 4l-7 6 7 6"></path></svg>'));
-  refs.xVal = h('div', { className: 'bevel-raised step-val pixel-text', style: 'min-width:50px;' });
-  refs.xIncBtn = h('div', { className: 'bevel-raised step-btn' }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M7 4l7 6-7 6"></path></svg>'));
-  var xGroup = h('div', { style: 'display:flex;align-items:center;gap:4px;' }, [refs.xDecBtn, refs.xVal, refs.xIncBtn]);
+  var rampSizeStepper = makeRampSizeStepper();
+  var totalColorsText = makeTotalColorsText();
+  var compactToggle = makeCompactToggleBtn();
+  compactToggle.btn.style.marginLeft = 'auto';
+  var sortBtn = makeSortBtn();
 
-  refs.totalColorsText = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(80% 0.15 195);letter-spacing:1px;' });
+  var desktopControlsRow = h('div', { className: 'desktop-controls-row', style: 'align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;flex-shrink:0;' },
+    [baseColorsLabel, colorCountStepper.root, sep, rampSizeLabel, rampSizeStepper.root, totalColorsText, compactToggle.btn, sortBtn]);
 
-  refs.compactInIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><polyline points="8,4 8,8 4,8"></polyline><polyline points="12,16 12,12 16,12"></polyline></svg>');
-  refs.compactOutIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><polyline points="4,8 4,4 8,4"></polyline><polyline points="16,12 16,16 12,16"></polyline></svg>');
-  refs.compactToggleBtn = h('div', { className: 'bevel-raised action-btn', style: 'color: oklch(80% 0.15 195); margin-left: auto;' }, [refs.compactInIcon, refs.compactOutIcon]);
-
-  refs.sortBtn = h('div', { className: 'bevel-raised action-btn', style: 'color: oklch(80% 0.15 195);', title: 'Sort base colors by hue' },
-    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><line x1="4" y1="5" x2="10" y2="5"></line><line x1="4" y1="10" x2="14" y2="10"></line><line x1="4" y1="15" x2="18" y2="15"></line></svg>'));
-
-  var controlsRow = h('div', { style: 'display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;flex-shrink:0;' },
-    [baseColorsLabel, colorCountGroup, sep, rampSizeLabel, xGroup, refs.totalColorsText, refs.compactToggleBtn, refs.sortBtn]);
+  // ---- Mobile controls row: BASE COLORS label + compact/sort, directly
+  // visible (color count and ramp size live only in the Settings tab). ----
+  var mobileCompactToggle = makeCompactToggleBtn();
+  var mobileSortBtn = makeSortBtn();
+  var mobileControlsRow = h('div', { className: 'mobile-controls-row' }, [
+    h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'BASE COLORS'),
+    h('div', { style: 'display:flex;gap:8px;margin-left:auto;' }, [mobileCompactToggle.btn, mobileSortBtn]),
+  ]);
 
   var divider = h('div', { style: 'height:1px;background:oklch(30% 0.04 290);flex-shrink:0;margin-bottom:18px;' });
 
@@ -833,27 +983,79 @@ function buildColorsPanel() {
   refs.noColorsMsg = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(55% 0.02 290);padding:20px 0;text-align:center;' }, 'No base colors yet.');
   var colorListWrapper = h('div', { className: 'colors-scroll' }, [refs.colorList, refs.noColorsMsg]);
 
-  panel.appendChild(controlsRow);
+  panel.appendChild(desktopControlsRow);
+  panel.appendChild(mobileControlsRow);
   panel.appendChild(divider);
   panel.appendChild(colorListWrapper);
   col.appendChild(panel);
 
-  refs.colorDecBtn.addEventListener('click', function () {
-    if (state.colors.length === 0) return;
-    setState({ colors: state.colors.slice(0, -1) });
-  });
-  refs.colorIncBtn.addEventListener('click', function () {
-    var hex = PRESET_HUES[state.nextId % PRESET_HUES.length];
-    setState({ colors: state.colors.concat([makeColorEntry(state.nextId, hex)]), nextId: state.nextId + 1 });
-  });
-  refs.xDecBtn.addEventListener('click', function () { if (state.X > 1) setState({ X: state.X - 1 }); });
-  refs.xIncBtn.addEventListener('click', function () { if (state.X < 4) setState({ X: state.X + 1 }); });
-  refs.compactToggleBtn.addEventListener('click', function () { setState({ compactRamps: !state.compactRamps }); });
-  refs.sortBtn.addEventListener('click', function () {
-    setState({ colors: state.colors.slice().sort(function (a, b) { return (a.hsvH || 0) - (b.hsvH || 0); }) });
-  });
-
   return col;
+}
+
+// ---------------------------------------------------------------------------
+// Mobile-only Settings tab: base-color-count and ramp-size steppers again,
+// as their own instances (see buildStepper's comment above).
+// ---------------------------------------------------------------------------
+function buildMobileSettingsPanel() {
+  var panel = h('div', { className: 'bevel-raised mobile-settings-panel', style: 'background:oklch(19% 0.035 290);padding:20px;flex-direction:column;gap:20px;' });
+  var title = h('div', { className: 'pixel-label', style: 'font-size:14px;color:oklch(80% 0.15 195);' }, 'SETTINGS');
+
+  var settingsColorCountStepper = makeColorCountStepper();
+  var settingsRampSizeStepper = makeRampSizeStepper();
+  var settingsTotalColorsText = makeTotalColorsText();
+
+  function settingBlock(labelText, trailingEl) {
+    return h('div', { style: 'display:flex;flex-direction:column;gap:8px;' }, [
+      h('div', { className: 'pixel-text', style: 'font-size:11px;color:oklch(60% 0.02 290);letter-spacing:1px;text-transform:uppercase;' }, labelText),
+      trailingEl,
+    ]);
+  }
+  var rampSizeRow = h('div', { style: 'display:flex;align-items:center;gap:14px;flex-wrap:wrap;' },
+    [settingsRampSizeStepper.root, settingsTotalColorsText]);
+
+  var divider = h('div', { style: 'height:1px;background:oklch(30% 0.04 290);' });
+
+  panel.appendChild(title);
+  panel.appendChild(settingBlock('Base Colors', settingsColorCountStepper.root));
+  panel.appendChild(divider);
+  panel.appendChild(settingBlock('Ramp Size', rampSizeRow));
+  return panel;
+}
+
+// ---------------------------------------------------------------------------
+// Mobile-only bottom nav bar: Color Ramps / Shift Settings / Color Wheel /
+// Settings. Desktop ignores this entirely (hidden via CSS); tapping Shift or
+// Wheel also drives state.rightTab so the existing bottom-panel show/hide
+// logic (updateRightTabs) just works unmodified.
+// ---------------------------------------------------------------------------
+function buildMobileNav() {
+  var nav = h('div', { className: 'mobile-nav' });
+  var ramspIcon = svgFromMarkup('<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"><rect x="1" y="7.5" width="5" height="5"></rect><rect x="7.5" y="7.5" width="5" height="5"></rect><rect x="14" y="7.5" width="5" height="5"></rect></svg>');
+  var shiftIcon = svgFromMarkup('<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="18" height="18" stroke="currentColor" stroke-width="1.4"></rect><polyline points="3.5,15 8,6.5 11,11.5 16.5,3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>');
+  var wheelIcon = h('div', { style: 'width:18px;height:18px;border-radius:50%;flex-shrink:0;background:conic-gradient(red, yellow, lime, cyan, blue, magenta, red);' });
+  var settingsIcon = svgFromMarkup('<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="5" x2="17" y2="5"></line><circle cx="12" cy="5" r="2" fill="currentColor"></circle><line x1="3" y1="10" x2="17" y2="10"></line><circle cx="7" cy="10" r="2" fill="currentColor"></circle><line x1="3" y1="15" x2="17" y2="15"></line><circle cx="14" cy="15" r="2" fill="currentColor"></circle></svg>');
+
+  var items = [
+    { key: 'ramps', label: 'RAMPS', icon: ramspIcon },
+    { key: 'shift', label: 'SHIFT', icon: shiftIcon },
+    { key: 'wheel', label: 'WHEEL', icon: wheelIcon },
+    { key: 'settings', label: 'SETTINGS', icon: settingsIcon },
+  ];
+  refs.mobileNavBtns = {};
+  items.forEach(function (item) {
+    var btn = h('div', { className: 'mobile-nav-btn' }, [
+      h('div', { className: 'mobile-nav-icon' }, item.icon),
+      h('div', { className: 'mobile-nav-label pixel-text' }, item.label),
+    ]);
+    btn.addEventListener('click', function () {
+      var patch = { mobileTab: item.key };
+      if (item.key === 'shift' || item.key === 'wheel') patch.rightTab = item.key;
+      setState(patch);
+    });
+    refs.mobileNavBtns[item.key] = btn;
+    nav.appendChild(btn);
+  });
+  return nav;
 }
 
 // ---------------------------------------------------------------------------
@@ -881,20 +1083,24 @@ function buildBottomPanel() {
   refs.activeDiceBtn = h('div', { className: 'bevel-raised', style: 'width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;', title: 'Cycle configuration' }, refs.activeDiceSvg);
   refs.activeDiceBtn.addEventListener('click', onCycleActiveConfig);
 
-  var infoBtn = h('div', { className: 'info-btn' }, [
-    h('div', { className: 'bevel-well', style: 'width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:help;' },
-      h('span', { className: 'pixel-label', style: 'font-size:11px;color:oklch(70% 0.13 195);line-height:1;' }, 'i')),
-    h('div', { className: 'info-popover' }, [
-      h('div', {}, [
-        h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'GRAPHS'),
-        h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, 'Drag a dot on the graph or type a value. Double-click a dot to switch it between automatic (white) and manual (hollow) tangents.'),
-      ]),
-      h('div', {}, [
-        h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'CONFIGURATIONS'),
-        h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, "The dice icon cycles through the configurations these cards edit - up to 6. Each base color has its own dice icon to assign it a configuration; colors sharing one share its shift settings. The + adds a new configuration; the X deletes the current one (at least one must remain)."),
-      ]),
+  var infoIcon = h('div', { className: 'bevel-well', style: 'width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:help;' },
+    h('span', { className: 'pixel-label', style: 'font-size:11px;color:oklch(70% 0.13 195);line-height:1;' }, 'i'));
+  refs.infoPopover = h('div', { className: 'info-popover' }, [
+    h('div', {}, [
+      h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'GRAPHS'),
+      h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, 'Drag a dot on the graph or type a value. Double-click a dot to switch it between automatic (white) and manual (hollow) tangents.'),
+    ]),
+    h('div', {}, [
+      h('div', { className: 'pixel-label', style: 'font-size:12px;color:oklch(80% 0.15 195);letter-spacing:1px;' }, 'CONFIGURATIONS'),
+      h('div', { className: 'pixel-text', style: 'font-size:12px;color:oklch(80% 0.02 290);margin-top:4px;' }, "The dice icon cycles through the configurations these cards edit - up to 6. Each base color has its own dice icon to assign it a configuration; colors sharing one share its shift settings. The + adds a new configuration; the X deletes the current one (at least one must remain)."),
     ]),
   ]);
+  // :hover (below) covers mouse users; touch devices have no real hover, so
+  // the icon also toggles state.infoOpen directly - see updateShiftPanel's
+  // '' vs 'flex' pattern (empty falls back to the CSS :hover rule).
+  refs.infoPopover.addEventListener('click', function (e) { e.stopPropagation(); });
+  infoIcon.addEventListener('click', function (e) { e.stopPropagation(); setState({ infoOpen: !state.infoOpen }); });
+  var infoBtn = h('div', { className: 'info-btn' }, [infoIcon, refs.infoPopover]);
 
   refs.addConfigBtn = h('div', { className: 'bevel-raised action-btn action-btn-sm' },
     svgFromMarkup('<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M10 4v12M4 10h12"></path></svg>'));
@@ -932,12 +1138,12 @@ function buildShell() {
   });
   var titleBlock = h('div', {}, [
     h('div', { className: 'pixel-label', style: 'font-size:20px;color:oklch(80% 0.15 195);line-height:1;' }, 'RAMPSMITH'),
-    h('div', { className: 'pixel-text', style: 'font-size:13px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;margin-top:6px;white-space:nowrap;' }, 'Pixel-Art Ramp Generator'),
+    h('div', { className: 'pixel-text app-tagline', style: 'font-size:13px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;margin-top:6px;white-space:nowrap;' }, 'Pixel-Art Ramp Generator'),
   ]);
   var headerLeft = h('div', { style: 'display:flex;align-items:center;gap:16px;flex-shrink:0;' }, [logoImg, titleBlock]);
 
-  var shareLabel = h('div', { className: 'pixel-text', style: 'font-size:11px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;' }, 'Share Link — updates live');
-  refs.shareText = h('div', { className: 'bevel-well pixel-text', style: 'width:min(460px, 100%);flex:1;min-width:0;height:40px;display:flex;align-items:center;padding:0 12px;background:oklch(11% 0.025 290);color:oklch(92% 0.01 290);font-size:14px;overflow:hidden;white-space:nowrap;' });
+  var shareLabel = h('div', { className: 'pixel-text share-label', style: 'font-size:11px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;' }, 'Share Link — updates live');
+  refs.shareText = h('div', { className: 'bevel-well pixel-text share-url-bar', style: 'width:min(460px, 100%);flex:1;min-width:0;height:40px;display:flex;align-items:center;padding:0 12px;background:oklch(11% 0.025 290);color:oklch(92% 0.01 290);font-size:14px;overflow:hidden;white-space:nowrap;' });
   refs.copyBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Copy share link' },
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><rect x="7" y="7" width="10" height="10"></rect><path d="M4 13V4a1 1 0 0 1 1-1h9"></path></svg>'));
   refs.copyBtn.addEventListener('click', onCopyShare);
@@ -948,10 +1154,13 @@ function buildShell() {
   var headerRight = h('div', { className: 'pf-header-right', style: 'display:flex;flex-direction:column;gap:6px;' }, [shareLabel, shareRow]);
 
   var header = h('div', { className: 'pf-header' }, [headerLeft, headerRight]);
-  var content = h('div', { className: 'pf-content' }, [buildColorsPanel(), buildBottomPanel()]);
+  refs.pfContent = h('div', { className: 'pf-content' },
+    [buildColorsPanel(), buildMobileShiftPreview(), buildBottomPanel(), buildMobileSettingsPanel()]);
+  var mobileNav = buildMobileNav();
 
   root.appendChild(header);
-  root.appendChild(content);
+  root.appendChild(refs.pfContent);
+  root.appendChild(mobileNav);
 }
 
 function render() {
@@ -961,6 +1170,7 @@ function render() {
   updateRightTabs();
   updateShiftPanel();
   updateWheel();
+  updateMobileNav();
 }
 
 function boot() {

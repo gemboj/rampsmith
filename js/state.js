@@ -15,6 +15,7 @@ function makeColorEntry(id, hex) {
     pickerMode: 'hsv',
     hexDraft: hex,
     configIndex: 0,
+    actionsOpen: false,
   }, fields);
 }
 
@@ -36,6 +37,9 @@ function createDefaultState() {
     compactRamps: false,
     selectedStep: 0,
     selectedAnchor: null,
+    mobileTab: 'ramps',
+    previewIndex: 0,
+    infoOpen: false,
   };
 }
 

@@ -847,10 +847,68 @@ function updateColorList() {
     if (expectedNode !== r.root) refs.colorList.insertBefore(r.root, expectedNode || null);
     updateColorItem(id);
   });
+  refs.colorList.className = state.compactRamps ? 'compact-ramp-list' : '';
   refs.colorList.style.cssText = state.compactRamps
     ? 'display:flex;flex-wrap:wrap;gap:0;'
     : 'display:grid;grid-template-columns:repeat(auto-fill, minmax(min(380px, 100%), 1fr));gap:20px;';
   refs.noColorsMsg.style.display = state.colors.length === 0 ? 'block' : 'none';
+  updateCompactBorders();
+}
+
+var COMPACT_BORDER_COLOR = 'oklch(30% 0.04 290)';
+function compactBorderShadow(sides) {
+  // Outset, not inset: these sides are only ever drawn where we've already
+  // confirmed nothing else is touching (see updateCompactBorders), so there's
+  // no neighbor to conflict with and no paint-order risk. Outset draws
+  // OUTSIDE the swatch's own box instead of eating into it, so the swatch's
+  // full 34x34 fill stays visible - an inset ring here shaved 1px off the
+  // exposed edge's own color, making the last (bottom-exposed) ramp in an
+  // uneven grid look 1px shorter than the fully-enclosed ramp above it.
+  var parts = [];
+  if (sides.top) parts.push('0 -1px 0 0 ' + COMPACT_BORDER_COLOR);
+  if (sides.bottom) parts.push('0 1px 0 0 ' + COMPACT_BORDER_COLOR);
+  if (sides.left) parts.push('-1px 0 0 0 ' + COMPACT_BORDER_COLOR);
+  if (sides.right) parts.push('1px 0 0 0 ' + COMPACT_BORDER_COLOR);
+  return parts.join(', ');
+}
+// Compact mode packs ramps with zero gap (see updateColorList above), so a
+// uniform ring on every swatch (like the non-compact .ramp-swatch class rule,
+// cancelled here via .compact-ramp-list) would show a doubled/glitchy seam
+// wherever two swatches touch - relying on paint order to merge them broke
+// under real repaint/scroll conditions. Instead, once flex-wrap has actually
+// settled the layout, read back which side of each RAMP (not swatch - only
+// the ramp's own first/last swatch needs a left/right edge) faces open
+// background rather than another ramp, and draw a border on only those
+// exposed sides via a directional inset box-shadow.
+function updateCompactBorders() {
+  if (!state.compactRamps) return;
+  var ramps = refs.colorList.children;
+  if (!ramps.length) return;
+  var rows = [];
+  for (var i = 0; i < ramps.length; i++) {
+    var top = ramps[i].offsetTop;
+    if (!rows.length || rows[rows.length - 1].top !== top) rows.push({ top: top, items: [] });
+    rows[rows.length - 1].items.push(ramps[i]);
+  }
+  rows.forEach(function (row, rowIdx) {
+    var prevCount = rowIdx > 0 ? rows[rowIdx - 1].items.length : 0;
+    var nextCount = rowIdx < rows.length - 1 ? rows[rowIdx + 1].items.length : 0;
+    row.items.forEach(function (rampEl, colIdx) {
+      var exposedTop = !(rowIdx > 0 && colIdx < prevCount);
+      var exposedBottom = !(rowIdx < rows.length - 1 && colIdx < nextCount);
+      var exposedLeft = colIdx === 0;
+      var exposedRight = colIdx === row.items.length - 1;
+      var swatches = rampEl.firstElementChild.children;
+      for (var j = 0; j < swatches.length; j++) {
+        swatches[j].style.boxShadow = compactBorderShadow({
+          top: exposedTop,
+          bottom: exposedBottom,
+          left: exposedLeft && j === 0,
+          right: exposedRight && j === swatches.length - 1,
+        });
+      }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1012,6 +1070,12 @@ function buildColorsPanel() {
   var divider = h('div', { style: 'height:1px;background:oklch(30% 0.04 290);flex-shrink:0;margin-bottom:18px;' });
 
   refs.colorList = h('div', {});
+  // Which ramp lands in which flex-wrap row/column (what updateCompactBorders
+  // needs) can change from a plain window/panel resize alone, with no state
+  // change to trigger a normal render() - watch colorList's own box directly.
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(function () { updateCompactBorders(); }).observe(refs.colorList);
+  }
   refs.noColorsMsg = h('div', { className: 'pixel-text', style: 'font-size:14px;color:oklch(55% 0.02 290);padding:20px 0;text-align:center;' }, 'No base colors yet.');
   var colorListWrapper = h('div', { className: 'colors-scroll' }, [refs.colorList, refs.noColorsMsg]);
 

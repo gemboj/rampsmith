@@ -76,7 +76,15 @@ a:hover { color: oklch(88% 0.13 195); }
   height: 34px;
   flex-shrink: 0;
   cursor: pointer;
+  /* Inset so it never bleeds onto a touching neighbor (unlike outset, which
+     needs paint order to avoid a doubled seam - see git history). Compact
+     mode (.compact-ramp-list below) cancels this back to none: swatches
+     there are meant to butt up against each other with no visible divider
+     at all, same as before this border existed - only the non-compact list,
+     where swatches already sit apart with a real gap, wants the border. */
+  box-shadow: inset 0 0 0 1px oklch(30% 0.04 290);
 }
+.compact-ramp-list .ramp-swatch { box-shadow: none; }
 .ramp-swatch-center {
   width: 42px;
   height: 42px;

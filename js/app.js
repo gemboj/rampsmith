@@ -120,7 +120,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
   svg.appendChild(polyline);
 
   function makeAnchorVisual() {
-    var hit = svgEl('circle', { class: 'curve-handle-hit', r: 12, fill: 'transparent' });
+    var hit = svgEl('circle', { class: 'curve-handle-hit', r: 20, fill: 'transparent' });
     var dot = svgEl('circle', { r: 4, stroke: lineColor, 'stroke-width': 2, style: 'pointer-events:none;' });
     svg.appendChild(hit); svg.appendChild(dot);
     return { hit: hit, dot: dot };
@@ -129,7 +129,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
 
   function makeHandleVisual() {
     var line = svgEl('line', { stroke: lineColor, 'stroke-width': 1, 'stroke-dasharray': '2,2', opacity: 0.5, style: 'display:none;' });
-    var hit = svgEl('circle', { class: 'curve-handle-hit', r: 12, fill: 'transparent', style: 'display:none;' });
+    var hit = svgEl('circle', { class: 'curve-handle-hit', r: 20, fill: 'transparent', style: 'display:none;' });
     var dot = svgEl('circle', { r: 4, fill: lineColor, stroke: 'oklch(11% 0.025 290)', 'stroke-width': 1.5, style: 'display:none;pointer-events:none;' });
     svg.appendChild(line); svg.appendChild(hit); svg.appendChild(dot);
     return { line: line, hit: hit, dot: dot };
@@ -137,6 +137,11 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
   var leftHandle = makeHandleVisual(), centerLeftHandle = makeHandleVisual(), centerRightHandle = makeHandleVisual(), rightHandle = makeHandleVisual();
 
   var plotWrap = h('div', { className: 'bevel-well curve-plot' }, svg);
+  // touch-action:none (above) isn't reliably honored by every mobile browser's
+  // scroll-gesture recognizer - see the same reasoning on wire()'s touchmove
+  // listener below. Without this, a touch that lands just off a hit circle
+  // still scrolls the page instead of doing nothing.
+  plotWrap.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
 
   // Redraw at the plot's actual rendered size whenever it changes (card
   // width flexes with the viewport; see [[curve-plot-no-stretch]]) instead
@@ -371,7 +376,7 @@ function buildShiftPanel() {
 // 28px size (see buildBottomPanel) - same control, so same appearance.
 // ---------------------------------------------------------------------------
 function buildMobileShiftPreview() {
-  refs.shiftPreviewRow = h('div', { className: 'shift-preview-row', style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;' });
+  refs.shiftPreviewRow = h('div', { className: 'shift-preview-row', style: 'display:flex;gap:4px;flex-wrap:wrap;align-items:center;justify-content:center;' });
   refs.previewDiceSvg = svgEl('svg', { width: 18, height: 18, viewBox: '0 0 20 20' });
   refs.previewDiceBtn = h('div', { className: 'bevel-raised', style: 'width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;' }, refs.previewDiceSvg);
   refs.previewDiceBtn.addEventListener('click', function (e) {

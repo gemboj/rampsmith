@@ -239,16 +239,20 @@ a:hover { color: oklch(88% 0.13 195); }
   width: 100%;
   flex: 1;
   min-height: 0;
+  /* A touch that lands just off an anchor/handle (see .curve-handle-hit)
+     shouldn't fall through to native page scroll - the whole plot area
+     is edit surface, not scrollable content. */
+  touch-action: none;
 }
 .mobile-shift-preview {
   display: none;
   flex-shrink: 0;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 6px;
   background: oklch(23% 0.035 290);
   border: 3px solid oklch(9% 0.02 290);
-  padding: 12px;
+  padding: 8px;
   touch-action: pan-y;
 }
 /* Dice button pinned at the true left edge (see justify-content above); the

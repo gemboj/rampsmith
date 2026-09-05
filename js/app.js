@@ -734,9 +734,13 @@ function onHexDraftChange(id, v) {
 // .popover) - fine there since the list never overlaps the header. Mobile
 // used to pin it to a fixed spot near the top of the screen regardless of
 // which color's swatch was tapped (to dodge .mobile-nav, which sits above it
-// in z-index); instead, anchor it to the actual button that was tapped, but
-// still clamp it so it can never render under the nav bar or spill off
-// either edge - including for the last color in the list, near the bottom.
+// in z-index). Now it anchors to the actual button that was tapped, and
+// always renders BELOW it (never flipped above) - keeping the swatch and its
+// full ramp visible above the popover while editing is the whole point, so
+// flipping above would defeat that. To guarantee it fits even for the last
+// color in the list, .colors-scroll reserves a large blank margin below the
+// ramps (see the mobile media query) - here we just scroll the page enough,
+// if needed, to open that reserved room up beneath the tapped button.
 function positionMobilePopover(popover, anchorBtn) {
   if (window.innerWidth > 1023) {
     popover.style.top = ''; popover.style.left = ''; popover.style.transform = '';
@@ -745,13 +749,18 @@ function positionMobilePopover(popover, anchorBtn) {
   var margin = 10;
   var navBar = document.querySelector('.mobile-nav');
   var navTop = navBar ? navBar.getBoundingClientRect().top : window.innerHeight;
-  var btnRect = anchorBtn.getBoundingClientRect();
-  var popRect = popover.getBoundingClientRect();
-  var maxBottom = navTop - margin;
+  var popRect = popover.getBoundingClientRect(); // width/height are scroll-independent, measure first
 
-  var top = btnRect.bottom + 8; // prefer just below the button
-  if (top + popRect.height > maxBottom) top = btnRect.top - popRect.height - 8; // flip above if it doesn't fit below
-  top = Math.max(margin, Math.min(top, maxBottom - popRect.height));
+  var btnRect = anchorBtn.getBoundingClientRect();
+  var needed = popRect.height + 8 + margin;
+  var available = navTop - btnRect.bottom;
+  if (available < needed) {
+    window.scrollBy(0, needed - available);
+    btnRect = anchorBtn.getBoundingClientRect(); // re-measure post-scroll
+  }
+
+  var top = btnRect.bottom + 8;
+  top = Math.max(margin, Math.min(top, navTop - margin - popRect.height));
 
   var left = btnRect.left + btnRect.width / 2 - popRect.width / 2; // centered on the button
   left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));

@@ -244,13 +244,16 @@ a:hover { color: oklch(88% 0.13 195); }
   display: none;
   flex-shrink: 0;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
   background: oklch(23% 0.035 290);
   border: 3px solid oklch(9% 0.02 290);
   padding: 12px;
   touch-action: pan-y;
 }
+/* Dice button pinned at the true left edge (see justify-content above); the
+   ramp row grows to fill the rest and centers itself within that space. */
+.shift-preview-row { flex: 1; }
 .curve-card-row {
   display: flex;
   flex-direction: row;
@@ -611,7 +614,9 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
   /* Lives as a sibling of .bottom-panel (not nested inside its box) and
      stays pinned to the top of the viewport while the curve cards below
      it scroll - see [[always-visible-preview]]. */
-  .pf-content[data-mobile-tab="shift"] .mobile-shift-preview {
+  .pf-content[data-mobile-tab="shift"] .mobile-shift-preview,
+  .pf-content[data-mobile-tab="wheel"] .mobile-shift-preview,
+  .pf-content[data-mobile-tab="settings"] .mobile-shift-preview {
     display: flex;
     position: sticky;
     top: 0;

@@ -276,6 +276,11 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
     hitEl.addEventListener('pointermove', drag.onPointerMove);
     hitEl.addEventListener('pointerup', drag.onPointerUp);
     hitEl.addEventListener('click', stopClick);
+    // touch-action:none (see .curve-handle-hit) and preventDefault() on the
+    // pointer handlers above aren't reliably honored by every mobile
+    // browser's scroll-gesture recognizer once a touch is already moving -
+    // a non-passive touchmove listener is the one mechanism that is.
+    hitEl.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
   }
   wire(leftAnchor.hit, makeAnchorDrag('left'));
   wire(centerAnchor.hit, makeAnchorDrag('center'));
@@ -358,15 +363,17 @@ function buildShiftPanel() {
 
 // ---------------------------------------------------------------------------
 // Mobile-only: pins one base color's ramp above (outside) the bottom-panel
-// box on the Shift Settings tab, sticky-positioned so it stays visible while
-// scrolling through the curve cards. A left/right swipe (Pointer Events, so
-// touch/mouse/pen all just work) steps state.previewIndex through
-// state.colors - no separate prev/next buttons needed.
+// box on the Shift Settings, Color Wheel and Settings tabs, sticky-positioned
+// so it stays visible while scrolling through each tab's own content. A
+// left/right swipe (Pointer Events, so touch/mouse/pen all just work) steps
+// state.previewIndex through state.colors - no separate prev/next buttons
+// needed. The dice button mirrors refs.activeDiceBtn's plain bevel look and
+// 28px size (see buildBottomPanel) - same control, so same appearance.
 // ---------------------------------------------------------------------------
 function buildMobileShiftPreview() {
-  refs.shiftPreviewRow = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;' });
+  refs.shiftPreviewRow = h('div', { className: 'shift-preview-row', style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;' });
   refs.previewDiceSvg = svgEl('svg', { width: 18, height: 18, viewBox: '0 0 20 20' });
-  refs.previewDiceBtn = h('div', { className: 'bevel-raised action-btn action-btn-sm' }, refs.previewDiceSvg);
+  refs.previewDiceBtn = h('div', { className: 'bevel-raised', style: 'width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;' }, refs.previewDiceSvg);
   refs.previewDiceBtn.addEventListener('click', function (e) {
     e.stopPropagation();
     var colors = state.colors;
@@ -374,7 +381,7 @@ function buildMobileShiftPreview() {
     var idx = clamp(state.previewIndex || 0, 0, colors.length - 1);
     onCycleConfig(colors[idx].id);
   });
-  refs.shiftPreviewWrap = h('div', { className: 'mobile-shift-preview' }, [refs.shiftPreviewRow, refs.previewDiceBtn]);
+  refs.shiftPreviewWrap = h('div', { className: 'mobile-shift-preview' }, [refs.previewDiceBtn, refs.shiftPreviewRow]);
 
   var previewSwipeStartX = null;
   refs.shiftPreviewWrap.addEventListener('pointerdown', function (e) { previewSwipeStartX = e.clientX; });
@@ -482,7 +489,11 @@ function ensureWheelMarker(id) {
   var dot = h('div', { style: 'width:' + (WHEEL_MARKER_R * 2) + 'px;height:' + (WHEEL_MARKER_R * 2) + 'px;border-radius:50%;border:2px solid oklch(11% 0.025 290);pointer-events:none;' });
   var hitPct = (WHEEL_HIT_R * 2 / WHEEL_SIZE * 100).toFixed(3) + '%';
   var hit = h('div', { className: 'wheel-dot-hit', style: 'position:absolute;width:' + hitPct + ';height:' + hitPct + ';' }, dot);
-  hit.addEventListener('pointerdown', function (e) { try { e.target.setPointerCapture(e.pointerId); } catch (err) {} });
+  hit.addEventListener('pointerdown', function (e) {
+    try { e.target.setPointerCapture(e.pointerId); } catch (err) {}
+    var idx = state.colors.findIndex(function (c) { return c.id === id; });
+    if (idx !== -1) setState({ previewIndex: idx });
+  });
   hit.addEventListener('pointermove', function (e) {
     if (e.buttons === 0) return;
     var pt = wheelLocalPoint(e, WHEEL_SIZE);

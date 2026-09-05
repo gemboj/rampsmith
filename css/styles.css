@@ -593,6 +593,20 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
     overflow-y: auto;
     z-index: 50;
   }
+  /* Same problem as .info-popover above: absolutely positioned off the
+     swatch button at a fixed 260px width/z-index 30, which both overflows
+     a phone viewport and renders underneath .mobile-nav (z-index 40).
+     Anchor to the viewport instead, above the nav bar. */
+  .popover {
+    position: fixed;
+    left: 50%;
+    top: 90px;
+    transform: translateX(-50%);
+    width: min(280px, calc(100vw - 32px));
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+    z-index: 50;
+  }
   .bottom-content { padding: 16px; }
   /* Lives as a sibling of .bottom-panel (not nested inside its box) and
      stays pinned to the top of the viewport while the curve cards below

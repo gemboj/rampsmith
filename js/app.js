@@ -220,6 +220,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
       },
       onPointerMove: function (e) {
         if (e.buttons === 0) return;
+        e.preventDefault();
         var pt = svgLocalPoint(e);
         setRange(sideName, clamp(Math.round(yToVal(pt.y, domainMin, domainMax, plotH)), domainMin, domainMax));
       },
@@ -234,6 +235,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
       onPointerDown: function (e) { e.preventDefault(); try { e.target.setPointerCapture(e.pointerId); } catch (err) {} },
       onPointerMove: function (e) {
         if (e.buttons === 0) return;
+        e.preventDefault();
         var pt = svgLocalPoint(e);
         var patch = {};
         patch[handleName] = { tFrac: pxToHandleFrac(pt.x, side, plotW), y: pxToHandleVal(pt.y, domainMin, domainMax, plotH) };
@@ -250,6 +252,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
       onPointerDown: function (e) { e.preventDefault(); try { e.target.setPointerCapture(e.pointerId); } catch (err) {} },
       onPointerMove: function (e) {
         if (e.buttons === 0) return;
+        e.preventDefault();
         var pt = svgLocalPoint(e);
         var tFrac = pxToHandleFrac(pt.x, displaySide, plotW);
         var y = pxToHandleVal(pt.y, domainMin, domainMax, plotH);
@@ -362,7 +365,16 @@ function buildShiftPanel() {
 // ---------------------------------------------------------------------------
 function buildMobileShiftPreview() {
   refs.shiftPreviewRow = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;' });
-  refs.shiftPreviewWrap = h('div', { className: 'mobile-shift-preview' }, [refs.shiftPreviewRow]);
+  refs.previewDiceSvg = svgEl('svg', { width: 18, height: 18, viewBox: '0 0 20 20' });
+  refs.previewDiceBtn = h('div', { className: 'bevel-raised action-btn action-btn-sm' }, refs.previewDiceSvg);
+  refs.previewDiceBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var colors = state.colors;
+    if (colors.length === 0) return;
+    var idx = clamp(state.previewIndex || 0, 0, colors.length - 1);
+    onCycleConfig(colors[idx].id);
+  });
+  refs.shiftPreviewWrap = h('div', { className: 'mobile-shift-preview' }, [refs.shiftPreviewRow, refs.previewDiceBtn]);
 
   var previewSwipeStartX = null;
   refs.shiftPreviewWrap.addEventListener('pointerdown', function (e) { previewSwipeStartX = e.clientX; });
@@ -404,6 +416,11 @@ function updateShiftPreview() {
     sw.style.background = hexColor;
     refs.shiftPreviewRow.appendChild(sw);
   });
+  refs.previewDiceSvg.innerHTML = '';
+  dicePips(c.configIndex || 0).forEach(function (pip) {
+    refs.previewDiceSvg.appendChild(svgEl('circle', { cx: pip.cx, cy: pip.cy, r: 2.4, fill: pip.color }));
+  });
+  refs.previewDiceBtn.title = 'Configuration ' + ((c.configIndex || 0) + 1) + ' — click to switch which configuration this color follows';
 }
 
 function onCycleActiveConfig() {
@@ -748,10 +765,9 @@ function updateColorItem(id) {
   r.rampRow.innerHTML = '';
   ramp.forEach(function (hexColor, i) {
     var sw = document.createElement('div');
-    sw.className = i === X ? 'ramp-swatch ramp-swatch-center' : 'ramp-swatch';
+    sw.className = (i === X && !isCompact) ? 'ramp-swatch ramp-swatch-center' : 'ramp-swatch';
     var style = 'background:' + hexColor + ';';
     if (!isCompact && hasSelection && i === selIndex) style += 'outline:2px solid oklch(80% 0.15 195); outline-offset:2px;';
-    if (isCompact && i === X) style += 'width:34px;height:34px;';
     sw.style.cssText = style;
     sw.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -920,7 +936,7 @@ function makeColorCountStepper() {
   return s;
 }
 function makeRampSizeStepper() {
-  var s = buildStepper(50);
+  var s = buildStepper(40);
   s.dec.addEventListener('click', function () { if (state.X > 1) setState({ X: state.X - 1 }); });
   s.inc.addEventListener('click', function () { if (state.X < 4) setState({ X: state.X + 1 }); });
   rampSizeSteppers.push(s);
@@ -1032,7 +1048,7 @@ function buildMobileNav() {
   var nav = h('div', { className: 'mobile-nav' });
   var ramspIcon = svgFromMarkup('<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"><rect x="1" y="7.5" width="5" height="5"></rect><rect x="7.5" y="7.5" width="5" height="5"></rect><rect x="14" y="7.5" width="5" height="5"></rect></svg>');
   var shiftIcon = svgFromMarkup('<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="18" height="18" stroke="currentColor" stroke-width="1.4"></rect><polyline points="3.5,15 8,6.5 11,11.5 16.5,3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>');
-  var wheelIcon = h('div', { style: 'width:18px;height:18px;border-radius:50%;flex-shrink:0;background:conic-gradient(red, yellow, lime, cyan, blue, magenta, red);' });
+  var wheelIcon = svgFromMarkup('<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="8"></circle><circle cx="10" cy="10" r="4"></circle></svg>');
   var settingsIcon = svgFromMarkup('<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="5" x2="17" y2="5"></line><circle cx="12" cy="5" r="2" fill="currentColor"></circle><line x1="3" y1="10" x2="17" y2="10"></line><circle cx="7" cy="10" r="2" fill="currentColor"></circle><line x1="3" y1="15" x2="17" y2="15"></line><circle cx="14" cy="15" r="2" fill="currentColor"></circle></svg>');
 
   var items = [
@@ -1070,7 +1086,7 @@ function buildBottomPanel() {
   var shiftIcon = svgFromMarkup('<svg width="34" height="34" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="18" height="18" stroke="currentColor" stroke-width="1.4"></rect><polyline points="3.5,15 8,6.5 11,11.5 16.5,3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>');
   refs.tabShiftBtn = h('div', { className: 'tab-btn vtab-icon-btn', title: 'Shift Settings' }, shiftIcon);
 
-  var wheelIcon = h('div', { style: 'width:18px;height:18px;border-radius:50%;flex-shrink:0;background:conic-gradient(red, yellow, lime, cyan, blue, magenta, red);' });
+  var wheelIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="8"></circle><circle cx="10" cy="10" r="4"></circle></svg>');
   refs.tabWheelBtn = h('div', { className: 'tab-btn vtab-icon-btn', title: 'Color Wheel' }, wheelIcon);
 
   refs.tabShiftBtn.addEventListener('click', function () { setState({ rightTab: 'shift' }); });

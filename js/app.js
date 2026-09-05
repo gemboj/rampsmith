@@ -497,7 +497,15 @@ function ensureWheelMarker(id) {
   hit.addEventListener('pointerdown', function (e) {
     try { e.target.setPointerCapture(e.pointerId); } catch (err) {}
     var idx = state.colors.findIndex(function (c) { return c.id === id; });
-    if (idx !== -1) setState({ previewIndex: idx });
+    if (idx === -1) return;
+    // Clicking a wheel dot always switches focus (tint + preview) to that
+    // color. The highlighted swatch step is shared across every ramp, so it
+    // only needs a default (the base swatch, step 0) when nothing was
+    // selected yet - otherwise leave whichever step was already active.
+    var hasSelection = state.selectedStep !== null && state.selectedStep !== undefined;
+    var patch = { previewIndex: idx, selectedColorId: id };
+    if (!hasSelection) patch.selectedStep = 0;
+    setState(patch);
   });
   hit.addEventListener('pointermove', function (e) {
     if (e.buttons === 0) return;
@@ -509,6 +517,11 @@ function ensureWheelMarker(id) {
     commitWheelHsv(id, newH, newS);
   });
   hit.addEventListener('pointerup', function (e) { try { e.target.releasePointerCapture(e.pointerId); } catch (err) {} });
+  // Selecting a base color via the wheel must survive the click that
+  // follows pointerup - without this, the click bubbles to onRootClick
+  // (root.addEventListener('click', ...)) and immediately clears the
+  // selectedStep just set by selectBaseColorPatch above.
+  hit.addEventListener('click', function (e) { e.stopPropagation(); });
   var refsObj = { hit: hit, dot: dot };
   wheelRefs.set(id, refsObj);
   return refsObj;
@@ -538,6 +551,9 @@ function updateWheel() {
     r.hit.style.left = ((mx - WHEEL_HIT_R) / WHEEL_SIZE * 100).toFixed(3) + '%';
     r.hit.style.top = ((my - WHEEL_HIT_R) / WHEEL_SIZE * 100).toFixed(3) + '%';
     r.dot.style.background = c.hex;
+    r.dot.style.boxShadow = c.id === state.selectedColorId
+      ? '0 0 0 2px oklch(80% 0.15 195), 0 0 0 4px oklch(11% 0.025 290)'
+      : 'none';
   });
 }
 
@@ -788,7 +804,12 @@ function onCopyHex(id) {
   colorCopyTimer = setTimeout(function () { setState({ copiedColorId: null }); }, 350);
 }
 function onRemoveColor(id) {
-  setState({ colors: state.colors.filter(function (x) { return x.id !== id; }) });
+  var patch = { colors: state.colors.filter(function (x) { return x.id !== id; }) };
+  if (state.selectedColorId === id) {
+    patch.selectedColorId = null;
+    patch.selectedStep = null;
+  }
+  setState(patch);
 }
 function onCycleConfig(id) {
   setState({ colors: state.colors.map(function (x) {
@@ -816,10 +837,11 @@ function updateColorItem(id) {
   var hasSelection = state.selectedStep !== null && state.selectedStep !== undefined;
   var selStep = hasSelection ? clamp(state.selectedStep, -X, X) : 0;
   var selIndex = selStep + X;
+  var isSelectedColor = state.selectedColorId === id;
 
   r.root.style.cssText = isCompact
-    ? 'display:flex;flex-direction:column;gap:4px;'
-    : 'display:flex;flex-direction:column;gap:8px;padding-bottom:16px;border-bottom:1px solid oklch(30% 0.04 290);';
+    ? 'display:flex;flex-direction:column;gap:4px;' + (isSelectedColor ? 'background: oklch(22% 0.03 290);' : '')
+    : 'display:flex;flex-direction:column;gap:8px;padding-bottom:16px;border-bottom:1px solid oklch(30% 0.04 290);' + (isSelectedColor ? 'border-radius:4px; background: oklch(22% 0.03 290);' : '');
   r.rampRow.style.cssText = 'display:flex;align-items:center;gap:' + (isCompact ? '0' : '7px') + ';';
 
   r.rampRow.innerHTML = '';
@@ -831,7 +853,7 @@ function updateColorItem(id) {
     sw.style.cssText = style;
     sw.addEventListener('click', function (e) {
       e.stopPropagation();
-      setState({ selectedStep: i - X });
+      setState({ selectedStep: i - X, selectedColorId: id });
     });
     r.rampRow.appendChild(sw);
   });
@@ -1017,7 +1039,10 @@ function onCopyShare() {
 function onRootClick() {
   var patch = {};
   if (state.selectedAnchor !== null) patch.selectedAnchor = null;
-  if (state.selectedStep !== null && state.selectedStep !== undefined) patch.selectedStep = null;
+  if (state.selectedStep !== null && state.selectedStep !== undefined) {
+    patch.selectedStep = null;
+    patch.selectedColorId = null;
+  }
   if (state.infoOpen) patch.infoOpen = false;
   var anyOpen = state.colors.some(function (c) { return c.pickerOpen || c.actionsOpen; });
   if (anyOpen) patch.colors = state.colors.map(function (c) {
@@ -1188,7 +1213,10 @@ function buildMobileNav() {
       h('div', { className: 'mobile-nav-icon' }, item.icon),
       h('div', { className: 'mobile-nav-label pixel-text' }, item.label),
     ]);
-    btn.addEventListener('click', function () {
+    btn.addEventListener('click', function (e) {
+      // See the desktop tab buttons above - stop this from bubbling to
+      // onRootClick and wiping the current selection out from under the user.
+      e.stopPropagation();
       var patch = { mobileTab: item.key };
       if (item.key === 'shift' || item.key === 'wheel') patch.rightTab = item.key;
       setState(patch);
@@ -1214,8 +1242,12 @@ function buildBottomPanel() {
   var wheelIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="8"></circle><circle cx="10" cy="10" r="4"></circle></svg>');
   refs.tabWheelBtn = h('div', { className: 'tab-btn vtab-icon-btn', title: 'Color Wheel' }, wheelIcon);
 
-  refs.tabShiftBtn.addEventListener('click', function () { setState({ rightTab: 'shift' }); });
-  refs.tabWheelBtn.addEventListener('click', function () { setState({ rightTab: 'wheel' }); });
+  // Switching tabs must not bubble to onRootClick (root.addEventListener
+  // ('click', onRootClick)) - otherwise it would immediately clear whatever
+  // swatch/base-color selection the user just made before they can act on it
+  // (e.g. right before dragging a color on the wheel).
+  refs.tabShiftBtn.addEventListener('click', function (e) { e.stopPropagation(); setState({ rightTab: 'shift' }); });
+  refs.tabWheelBtn.addEventListener('click', function (e) { e.stopPropagation(); setState({ rightTab: 'wheel' }); });
   var tabsCol = h('div', { className: 'vtabs-col' }, [refs.tabShiftBtn, refs.tabWheelBtn]);
 
   var tabsDivider = h('div', { className: 'tabs-divider' });

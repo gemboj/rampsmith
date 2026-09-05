@@ -35,11 +35,12 @@ function createDefaultState() {
     copiedColorId: null,
     rightTab: 'shift',
     compactRamps: false,
-    selectedStep: 0,
+    selectedStep: null,
     selectedAnchor: null,
     mobileTab: 'ramps',
     previewIndex: 0,
     infoOpen: false,
+    selectedColorId: null,
   };
 }
 

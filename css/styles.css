@@ -413,7 +413,11 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 5px;
+  /* A couple px more than the selected-color tint's box-shadow spread (8px,
+     set inline in updateColorItem, js/app.js) so that spread never gets
+     clipped by this container's own overflow clipping when the tinted item
+     sits on an edge/corner. */
+  padding: 10px;
 }
 
 /* ==== Bottom panel (Shift Settings / Color Wheel) - vertical tabs on the

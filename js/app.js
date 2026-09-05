@@ -839,9 +839,14 @@ function updateColorItem(id) {
   var selIndex = selStep + X;
   var isSelectedColor = state.selectedColorId === id;
 
+  // The tint is drawn via box-shadow (not padding/margin) so it can bleed a
+  // few px past the item's own box - covering the oversized center swatch,
+  // the even-bigger swatch button below it, the row of action buttons at the
+  // right edge, and the selected-swatch outline (2px + 2px offset) - without
+  // resizing the item itself or disturbing the grid's gap between ramps.
   r.root.style.cssText = isCompact
     ? 'display:flex;flex-direction:column;gap:4px;' + (isSelectedColor ? 'background: oklch(22% 0.03 290);' : '')
-    : 'display:flex;flex-direction:column;gap:8px;padding-bottom:16px;border-bottom:1px solid oklch(30% 0.04 290);' + (isSelectedColor ? 'border-radius:4px; background: oklch(22% 0.03 290);' : '');
+    : 'display:flex;flex-direction:column;gap:8px;padding-bottom:16px;border-bottom:1px solid oklch(30% 0.04 290);' + (isSelectedColor ? 'background: oklch(22% 0.03 290); box-shadow: 0 0 0 8px oklch(22% 0.03 290);' : '');
   r.rampRow.style.cssText = 'display:flex;align-items:center;gap:' + (isCompact ? '0' : '7px') + ';';
 
   r.rampRow.innerHTML = '';

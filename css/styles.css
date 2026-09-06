@@ -568,15 +568,13 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
      bordered bar above the wheel disc. */
   .pf-content[data-mobile-tab="wheel"] .vertical-tabs { display: none; }
 
-  /* margin-bottom (not padding on the bordered panel inside) reserves room
-     below the last ramp so the color-edit popover (see positionMobilePopover
-     in app.js) always has space to render below its swatch button, however
-     far down the list that swatch is - without this, the last color's
-     popover would have nowhere to go but off-screen or under the nav bar.
-     340px comfortably covers the popover's tallest state (see .popover's
-     max-height) plus margin; putting it here (outside the bordered box)
-     keeps that box snug around the actual ramp content. */
-  .colors-panel { min-height: 0; margin-bottom: 340px; }
+  /* margin-bottom (not padding on the bordered panel inside) leaves a little
+     breathing room below the last ramp above the fixed nav bar. The popover
+     (see positionPopover in app.js) no longer needs scroll room reserved
+     here - it's clamped to the viewport bottom and deliberately overlaps the
+     nav bar (which sits above it, z-index-wise) for a swatch near the end of
+     the list rather than forcing a scroll to dodge it. */
+  .colors-panel { min-height: 0; margin-bottom: 24px; }
   .colors-scroll { flex: none; overflow-y: visible; }
   .desktop-controls-row { display: none; }
   .mobile-controls-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-shrink: 0; }

@@ -858,7 +858,15 @@ function onToggleActionsMenu(id, e) {
 }
 function onCopyHex(id) {
   var c = getColor(id);
-  try { navigator.clipboard.writeText(c.hex); } catch (e) {}
+  var hexToCopy = c.hex;
+  var hasSelection = state.selectedColorId === id && state.selectedStep !== null && state.selectedStep !== undefined;
+  if (hasSelection) {
+    var X = state.X;
+    var config = state.shiftConfigs[c.configIndex || 0];
+    var ramp = genRamp(c.hex, X, config.hue, config.sat, config.val);
+    hexToCopy = ramp[clamp(state.selectedStep, -X, X) + X];
+  }
+  try { navigator.clipboard.writeText(hexToCopy); } catch (e) {}
   clearTimeout(colorCopyTimer);
   setState({ copiedColorId: id });
   colorCopyTimer = setTimeout(function () { setState({ copiedColorId: null }); }, 350);
@@ -1000,6 +1008,7 @@ function updateColorItem(id) {
   r.copyIcon.style.cssText = c.id === state.copiedColorId
     ? 'background: oklch(80% 0.15 195); color: oklch(14% 0.03 290);'
     : 'background: oklch(24% 0.035 290); color: oklch(80% 0.15 195);';
+  r.copyIcon.title = (isSelectedColor && hasSelection) ? 'Copy selected swatch hex' : 'Copy base color hex';
 }
 
 function updateColorList() {

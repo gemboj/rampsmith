@@ -1142,7 +1142,7 @@ function onRootClick() {
 // ---------------------------------------------------------------------------
 function buildStepper(minWidth) {
   var dec = h('div', { className: 'bevel-raised step-btn' }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M13 4l-7 6 7 6"></path></svg>'));
-  var val = h('div', { className: 'bevel-well step-val pixel-text', style: 'min-width:' + minWidth + 'px;' });
+  var val = h('div', { className: 'step-val pixel-text', style: 'min-width:' + minWidth + 'px;' });
   var inc = h('div', { className: 'bevel-raised step-btn', style: STYLE_ACTIVE }, svgFromMarkup('<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M7 4l7 6-7 6"></path></svg>'));
   var root = h('div', { style: 'display:flex;align-items:center;gap:4px;' }, [dec, val, inc]);
   return { root: root, dec: dec, val: val, inc: inc };

@@ -140,7 +140,13 @@ function shiftFor(comp, X, step) {
   var M = curveValueAt(comp, X, 0);
   return curveValueAt(comp, X, step) - M;
 }
-function genRamp(hex, X, hue, sat, val) {
+// Same math as genRamp, but keeps the L/C percentages around long enough to
+// report which steps are sitting right at the 0%/100% boundary - genRamp
+// itself just throws that away and returns hex strings, which is all most
+// callers (export.js, the shift preview) want. updateColorItem uses this
+// version instead so it can flag steps whose L or C hit the gamut/domain
+// boundary - see [[ramp-clip-consistency-check]].
+function genRampSteps(hex, X, hue, sat, val) {
   var rgb = hexToRgb(hex);
   var oklch = rgbToOklch(rgb[0], rgb[1], rgb[2]);
   var L0 = oklch[0], C0 = oklch[1], H0 = oklch[2];
@@ -148,17 +154,58 @@ function genRamp(hex, X, hue, sat, val) {
   var baseCFrac = baseMaxC > 1e-6 ? (C0 / baseMaxC) * 100 : 0;
   var baseLPct = L0 * 100;
   var satM = curveValueAt(sat, X, 0), valM = curveValueAt(val, X, 0);
-  var ramp = [];
+  var steps = [];
   for (var step = -X; step <= X; step++) {
-    if (step === 0) { ramp.push(toHex(rgb[0], rgb[1], rgb[2])); continue; }
+    // lPct/cPct are the final (already-clamped) percentages, kept on every
+    // step - rampClipFlags only cares whether the OUTPUT sits at 0/100, not
+    // how it got there (clamped past the domain, or landed there exactly
+    // through valid interpolation - e.g. an anchor set to exactly 100).
+    if (step === 0) { steps.push({ hex: toHex(rgb[0], rgb[1], rgb[2]), lPct: baseLPct, cPct: baseCFrac }); continue; }
     var nh = ((H0 + hueRotationSign(H0, OKLCH_YELLOW_H) * shiftFor(hue, X, step)) % 360 + 360) % 360;
     var nLPct = clamp(baseLPct + targetRelativeShift(curveValueAt(val, X, step), valM, baseLPct), 0, 100);
     var nCFracPct = clamp(baseCFrac + targetRelativeShift(curveValueAt(sat, X, step), satM, baseCFrac), 0, 100);
     var nL = nLPct / 100;
     var nC = (nCFracPct / 100) * maxChromaAt(nL, nh);
-    ramp.push(oklchToHex(nL, nC, nh));
+    steps.push({ hex: oklchToHex(nL, nC, nh), lPct: nLPct, cPct: nCFracPct });
   }
-  return ramp;
+  return steps;
+}
+function genRamp(hex, X, hue, sat, val) {
+  return genRampSteps(hex, X, hue, sat, val).map(function (s) { return s.hex; });
+}
+// A single step sitting at 0%/100% is tolerated - that's just the color (or
+// the curve's own anchor) running out of room at one step, and the result
+// still reads as a normal ramp. Two or more steps *in a row* sitting at the
+// SAME 0%/100% value is the pattern that actually loses color: whatever the
+// curve wanted to keep doing, the output stopped changing for multiple
+// consecutive steps, which reads as a flattened/banded patch rather than a
+// smooth ramp - regardless of whether any one of them got there by being
+// clamped past the domain, or simply computed to exactly 0/100 on its own
+// (small undershoots that individually look "not quite clamped" still end
+// up clamped to the exact same output, so checking the final percentage
+// directly - not some "was it clamped" magnitude test - is what actually
+// matches what the eye sees).
+var BOUNDARY_EPSILON = 0.05;
+function boundaryDir(pct) {
+  if (pct >= 100 - BOUNDARY_EPSILON) return 'high';
+  if (pct <= BOUNDARY_EPSILON) return 'low';
+  return null;
+}
+function rampClipFlags(steps) {
+  var n = steps.length;
+  var flags = steps.map(function () { return { l: false, c: false }; });
+  function hasMatchingNeighbor(i, pctKey) {
+    var dir = boundaryDir(steps[i][pctKey]);
+    if (!dir) return false;
+    var left = i > 0 && boundaryDir(steps[i - 1][pctKey]) === dir;
+    var right = i < n - 1 && boundaryDir(steps[i + 1][pctKey]) === dir;
+    return left || right;
+  }
+  for (var i = 0; i < n; i++) {
+    flags[i].l = hasMatchingNeighbor(i, 'lPct');
+    flags[i].c = hasMatchingNeighbor(i, 'cPct');
+  }
+  return flags;
 }
 
 function round2(n) { return Math.round(n * 100) / 100; }

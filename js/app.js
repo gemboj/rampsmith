@@ -62,6 +62,10 @@ var sortBtnInstances = [];
 var totalColorsTexts = [];
 
 var WHEEL_SIZE = 380, WHEEL_MARKER_R = 7, WHEEL_HIT_R = 13;
+// Amber, not the pink used for delete/remove-btn - this flags a possible
+// ramp-generation issue (see rampClipFlags in curve.js), not a destructive
+// action, so it shouldn't read as "danger" the same way.
+var CLIP_WARN_COLOR = 'oklch(78% 0.16 70)';
 var wheelCx = WHEEL_SIZE / 2, wheelCy = WHEEL_SIZE / 2;
 var wheelEffR = WHEEL_SIZE / 2 - WHEEL_MARKER_R - 4;
 
@@ -834,6 +838,26 @@ function onCycleColorDisplay(e) {
   setState({ colorDisplayMode: order[(idx + 1) % order.length] });
 }
 
+// formatColorDisplay returns a plain string, which is all displayLabel (the
+// base color, never clipped) needs - but the selected-swatch label also
+// wants to color in just the L or C number when that step's clip is flagged
+// as suspicious (see rampClipFlags). Only 'oklch' mode has L/C as their own
+// separate, labeled numbers; hex has none and hsv's S/V aren't the same
+// clamped quantities, so this only ever colors something in oklch mode.
+function renderSelectedLabel(el, hex, mode, flag) {
+  el.innerHTML = '';
+  if (mode !== 'oklch' || !flag || (!flag.l && !flag.c)) { el.textContent = formatColorDisplay(hex, mode); return; }
+  var f = deriveColorFields(hex);
+  function seg(text, warn) {
+    var span = document.createElement('span');
+    if (warn) span.style.color = CLIP_WARN_COLOR;
+    span.textContent = text;
+    el.appendChild(span);
+  }
+  seg('L:' + f.oklchL, flag.l);
+  seg(' C:' + f.oklchC, flag.c);
+  seg(' H:' + f.oklchH, false);
+}
 function updateColorItem(id) {
   var r = ensureColorRefs(id);
   var c = getColor(id);
@@ -841,7 +865,9 @@ function updateColorItem(id) {
   var isCompact = !!state.compactRamps;
   var colorConfigIndex = c.configIndex || 0;
   var colorConfig = state.shiftConfigs[colorConfigIndex];
-  var ramp = genRamp(c.hex, X, colorConfig.hue, colorConfig.sat, colorConfig.val);
+  var rampSteps = genRampSteps(c.hex, X, colorConfig.hue, colorConfig.sat, colorConfig.val);
+  var ramp = rampSteps.map(function (s) { return s.hex; });
+  var clipFlags = rampClipFlags(rampSteps);
 
   var hasSelection = state.selectedStep !== null && state.selectedStep !== undefined;
   var selStep = hasSelection ? clamp(state.selectedStep, -X, X) : 0;
@@ -862,9 +888,21 @@ function updateColorItem(id) {
   ramp.forEach(function (hexColor, i) {
     var sw = document.createElement('div');
     sw.className = (i === X && !isCompact) ? 'ramp-swatch ramp-swatch-center' : 'ramp-swatch';
+    var flag = clipFlags[i];
+    var flagged = !isCompact && (flag.l || flag.c);
     var style = 'background:' + hexColor + ';';
     if (!isCompact && hasSelection && i === selIndex) style += 'outline:2px solid oklch(80% 0.15 195); outline-offset:2px;';
+    if (flagged) style += 'position:relative;';
     sw.style.cssText = style;
+    if (flagged) {
+      var label = flag.l && flag.c ? 'L and C' : flag.l ? 'L' : 'C';
+      sw.title = label + ' hit its limit here, and the next step out did too - this may be an unintended clip rather than a deliberate curve peak.';
+      var marker = document.createElement('div');
+      marker.style.cssText = 'position:absolute;top:-3px;right:-3px;width:0;height:0;'
+        + 'border-left:5px solid transparent;border-right:5px solid transparent;'
+        + 'border-bottom:8px solid ' + CLIP_WARN_COLOR + ';pointer-events:none;';
+      sw.appendChild(marker);
+    }
     sw.addEventListener('click', function (e) {
       e.stopPropagation();
       setState({ selectedStep: i - X, selectedColorId: id });
@@ -876,7 +914,8 @@ function updateColorItem(id) {
   if (isCompact) return;
 
   r.displayLabel.textContent = formatColorDisplay(c.hex, state.colorDisplayMode);
-  r.selectedLabel.textContent = hasSelection ? formatColorDisplay(ramp[selIndex], state.colorDisplayMode) : ' ';
+  if (hasSelection) renderSelectedLabel(r.selectedLabel, ramp[selIndex], state.colorDisplayMode, clipFlags[selIndex]);
+  else r.selectedLabel.textContent = ' ';
   r.selectedLabel.style.visibility = hasSelection ? 'visible' : 'hidden';
 
   r.swatchBtn.style.background = c.hex;

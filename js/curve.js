@@ -280,19 +280,19 @@ var DEFAULT_COMPONENTS = {
     leftHandle: { tFrac: 2 / 3, y: -10 }, centerHandleLeft: { tFrac: 1 / 3, y: -5 },
     centerHandleRight: { tFrac: 1 / 3, y: 5 }, rightHandle: { tFrac: 2 / 3, y: 10 },
   },
-  // Mirrored relative to val below: darker steps (left) get more chroma,
-  // lighter steps (right) get less - near-white has little gamut room for
-  // chroma anyway (see maxChromaAt), and it matches how most hand-tuned
-  // ramps actually look (saturated shadows, muted/pastel tints).
+  // range values are the raw 0..100 storage domain - the display shown to
+  // the user (see buildCard's toDisplayRange in app.js) is -45/0/55 for
+  // this card's left/center/right, i.e. (display + 100) / 2.
   sat: {
-    left: { range: 80, handleType: 'auto' }, center: { range: 50, handleType: 'auto' }, right: { range: 20, handleType: 'auto' },
-    leftHandle: { tFrac: 2 / 3, y: 70 }, centerHandleLeft: { tFrac: 1 / 3, y: 60 },
-    centerHandleRight: { tFrac: 1 / 3, y: 40 }, rightHandle: { tFrac: 2 / 3, y: 30 },
+    left: { range: 27.5, handleType: 'auto' }, center: { range: 50, handleType: 'auto' }, right: { range: 77.5, handleType: 'auto' },
+    leftHandle: { tFrac: 2 / 3, y: 27.5 + (50 - 27.5) / 3 }, centerHandleLeft: { tFrac: 1 / 3, y: 50 - (77.5 - 27.5) / 6 },
+    centerHandleRight: { tFrac: 1 / 3, y: 50 + (77.5 - 27.5) / 6 }, rightHandle: { tFrac: 2 / 3, y: 77.5 - (77.5 - 50) / 3 },
   },
+  // Displayed as -35/0/55 (see sat's comment above for the mapping).
   val: {
-    left: { range: 15, handleType: 'auto' }, center: { range: 52.5, handleType: 'auto' }, right: { range: 90, handleType: 'auto' },
-    leftHandle: { tFrac: 2 / 3, y: 27.5 }, centerHandleLeft: { tFrac: 1 / 3, y: 40 },
-    centerHandleRight: { tFrac: 1 / 3, y: 65 }, rightHandle: { tFrac: 2 / 3, y: 77.5 },
+    left: { range: 32.5, handleType: 'auto' }, center: { range: 50, handleType: 'auto' }, right: { range: 77.5, handleType: 'auto' },
+    leftHandle: { tFrac: 2 / 3, y: 32.5 + (50 - 32.5) / 3 }, centerHandleLeft: { tFrac: 1 / 3, y: 50 - (77.5 - 32.5) / 6 },
+    centerHandleRight: { tFrac: 1 / 3, y: 50 + (77.5 - 32.5) / 6 }, rightHandle: { tFrac: 2 / 3, y: 77.5 - (77.5 - 50) / 3 },
   },
 };
 function defaultComponent(key) {

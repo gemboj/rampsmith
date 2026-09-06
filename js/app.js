@@ -95,6 +95,20 @@ function getColor(id) { return state.colors.find(function (c) { return c.id === 
 // ---------------------------------------------------------------------------
 function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
   var domainMin = absoluteTarget ? 0 : -100, domainMax = 100;
+  // Chroma/Lightness anchors are stored (and drive the actual curve math in
+  // curve.js) as an absolute 0..100 target, same as ever - only the number
+  // shown in/typed into the left/center/right inputs is remapped to a
+  // -100..100 scale, matching Hue's already-signed range, so all three cards
+  // read the same way. That keeps a mid-range anchor (the common case for
+  // "no change") at a consistent 0 instead of Chroma/Lightness's own 50, and
+  // avoids the confusion of typing V=95 and not getting exactly 95 lightness
+  // at the end of the ramp - these are relative-to-base anchors, not
+  // absolute targets, and a symmetric range reads that way more honestly.
+  // The drag/plot math below is untouched: it still works entirely in the
+  // raw 0..100 storage domain (domainMin/domainMax above), so anchor pixel
+  // positions and curve shape are identical to before this remap.
+  function toDisplayRange(raw) { return absoluteTarget ? raw * 2 - 100 : raw; }
+  function toRawRange(display) { return absoluteTarget ? (display + 100) / 2 : display; }
 
   var swatch = h('div', { className: 'hsv-swatch', style: swatchStyle });
   var labelEl = h('div', { className: 'pixel-label', style: 'font-size:13px;color:oklch(92% 0.01 290);' }, label);
@@ -303,7 +317,7 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
     input.addEventListener('change', function (e) {
       var v = parseInt(e.target.value, 10);
       if (isNaN(v)) return;
-      setRange(sideName, clamp(v, domainMin, domainMax));
+      setRange(sideName, toRawRange(clamp(v, -100, 100)));
     });
   }
   wireRange(leftRangeInput, 'left');
@@ -349,9 +363,9 @@ function buildCard(key, label, swatchStyle, lineColor, absoluteTarget) {
     placeHandle(centerRightHandle, curveData.centerHandleRight.x, curveData.centerHandleRight.y, curveData.centerX, curveData.centerY, showCenter);
     placeHandle(rightHandle, curveData.rightHandle.x, curveData.rightHandle.y, curveData.rightAnchor.x, curveData.rightAnchor.y, isSelected('right') && comp.right.handleType === 'manual');
 
-    leftRangeInput.value = String(comp.left.range);
-    centerRangeInput.value = String(comp.center.range);
-    rightRangeInput.value = String(comp.right.range);
+    leftRangeInput.value = String(toDisplayRange(comp.left.range));
+    centerRangeInput.value = String(toDisplayRange(comp.center.range));
+    rightRangeInput.value = String(toDisplayRange(comp.right.range));
   }
 
   return { root: root, update: update };

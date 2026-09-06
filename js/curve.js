@@ -288,11 +288,11 @@ var DEFAULT_COMPONENTS = {
     leftHandle: { tFrac: 2 / 3, y: 27.5 + (50 - 27.5) / 3 }, centerHandleLeft: { tFrac: 1 / 3, y: 50 - (77.5 - 27.5) / 6 },
     centerHandleRight: { tFrac: 1 / 3, y: 50 + (77.5 - 27.5) / 6 }, rightHandle: { tFrac: 2 / 3, y: 77.5 - (77.5 - 50) / 3 },
   },
-  // Displayed as -35/0/55 (see sat's comment above for the mapping).
+  // Displayed as -55/0/55 (see sat's comment above for the mapping).
   val: {
-    left: { range: 32.5, handleType: 'auto' }, center: { range: 50, handleType: 'auto' }, right: { range: 77.5, handleType: 'auto' },
-    leftHandle: { tFrac: 2 / 3, y: 32.5 + (50 - 32.5) / 3 }, centerHandleLeft: { tFrac: 1 / 3, y: 50 - (77.5 - 32.5) / 6 },
-    centerHandleRight: { tFrac: 1 / 3, y: 50 + (77.5 - 32.5) / 6 }, rightHandle: { tFrac: 2 / 3, y: 77.5 - (77.5 - 50) / 3 },
+    left: { range: 22.5, handleType: 'auto' }, center: { range: 50, handleType: 'auto' }, right: { range: 77.5, handleType: 'auto' },
+    leftHandle: { tFrac: 2 / 3, y: 22.5 + (50 - 22.5) / 3 }, centerHandleLeft: { tFrac: 1 / 3, y: 50 - (77.5 - 22.5) / 6 },
+    centerHandleRight: { tFrac: 1 / 3, y: 50 + (77.5 - 22.5) / 6 }, rightHandle: { tFrac: 2 / 3, y: 77.5 - (77.5 - 50) / 3 },
   },
 };
 function defaultComponent(key) {

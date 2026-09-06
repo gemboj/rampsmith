@@ -1082,11 +1082,20 @@ function updateCompactBorders() {
 // Base colors panel header controls + right-column tabs + header share box.
 // ---------------------------------------------------------------------------
 function updateBaseColorsHeader() {
+  var atMaxColors = state.colors.length >= MAX_BASE_COLORS;
   var colorDecStyle = state.colors.length === 0 ? STYLE_DISABLED : STYLE_ACTIVE;
+  var colorIncStyle = atMaxColors ? STYLE_DISABLED : STYLE_ACTIVE;
   colorCountSteppers.forEach(function (s) {
     s.val.textContent = String(state.colors.length);
     s.dec.style.cssText = colorDecStyle;
+    s.inc.style.cssText = colorIncStyle;
   });
+  if (refs.addColorBtn) {
+    refs.addColorBtn.style.color = atMaxColors ? 'oklch(38% 0.02 290)' : 'oklch(80% 0.15 195)';
+    refs.addColorBtn.style.cursor = atMaxColors ? 'default' : 'pointer';
+    refs.addColorBtn.style.pointerEvents = atMaxColors ? 'none' : '';
+    refs.addColorBtn.title = atMaxColors ? 'Maximum of ' + MAX_BASE_COLORS + ' base colors reached' : '';
+  }
   var xDecStyle = state.X <= 1 ? STYLE_DISABLED : STYLE_ACTIVE;
   var xIncStyle = state.X >= 4 ? STYLE_DISABLED : STYLE_ACTIVE;
   rampSizeSteppers.forEach(function (s) {
@@ -1167,6 +1176,7 @@ function buildStepper(minWidth) {
 // live in one place, each surface gets its own instance; all instances are
 // kept in module-level arrays so a single state change updates every copy.
 function addColor() {
+  if (state.colors.length >= MAX_BASE_COLORS) return;
   setState({ colors: state.colors.concat([makeColorEntry(state.nextId, randomAutoColorHex())]), nextId: state.nextId + 1 });
 }
 function makeColorCountStepper() {
@@ -1260,6 +1270,7 @@ function buildColorsPanel() {
     style: 'display:flex;align-items:center;justify-content:center;gap:8px;height:44px;margin-top:14px;flex-shrink:0;cursor:pointer;color:oklch(80% 0.15 195);user-select:none;',
   }, [addColorIcon, h('div', { className: 'pixel-label', style: 'font-size:13px;letter-spacing:1px;' }, 'ADD COLOR')]);
   addColorBtn.addEventListener('click', addColor);
+  refs.addColorBtn = addColorBtn;
 
   panel.appendChild(desktopControlsRow);
   panel.appendChild(mobileControlsRow);

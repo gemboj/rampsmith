@@ -4,6 +4,8 @@
 // (Main.dc.html:2364-2369, using encodeShift) - this just also parses it
 // back on load and writes it to location.hash instead of only displaying it.
 
+var MAX_BASE_COLORS = 30;
+
 function makeColorEntry(id, hex) {
   var fields = deriveColorFields(hex);
   return Object.assign({
@@ -18,7 +20,7 @@ function makeColorEntry(id, hex) {
 }
 
 function createDefaultState() {
-  var initialX = 4;
+  var initialX = 2;
   return {
     colors: [
       makeColorEntry(1, randomAutoColorHex()),
@@ -89,7 +91,7 @@ function decodeShareQuery(query) {
       var entry = makeColorEntry(idx + 1, hex.toLowerCase());
       entry.configIndex = configIndex;
       return entry;
-    }).filter(Boolean);
+    }).filter(Boolean).slice(0, MAX_BASE_COLORS);
     if (colorEntries.length === 0) return null;
 
     var maxConfigIndex = Math.max(0, colorEntries.reduce(function (m, c) { return Math.max(m, c.configIndex); }, 0));

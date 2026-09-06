@@ -734,59 +734,71 @@ function onHexDraftChange(id, v) {
     return next;
   }) });
 }
-// The desktop popover just sits absolutely positioned off swatchWrap (see
-// .popover) - fine there since the list never overlaps the header. Mobile
-// used to pin it to a fixed spot near the top of the screen regardless of
-// which color's swatch was tapped (to dodge .mobile-nav, which sits above it
-// in z-index). Now it anchors to the actual button that was tapped, and
-// always renders BELOW it (never flipped above) - keeping the swatch and its
-// full ramp visible above the popover while editing is the whole point, so
-// flipping above would defeat that. To guarantee it fits even for the last
-// color in the list, .colors-scroll reserves a large blank margin below the
-// ramps (see the mobile media query) - here we just scroll the page enough,
-// if needed, to open that reserved room up beneath the tapped button.
-function positionMobilePopover(popover, anchorBtn) {
-  if (window.innerWidth > 1023) {
-    popover.style.top = ''; popover.style.left = ''; popover.style.transform = '';
+// The popover is always position:fixed (see .popover) - viewport-relative,
+// so it escapes .colors-scroll's overflow clipping entirely instead of
+// getting cut off whenever its swatch sits near the scrolled edge of that
+// list. That means it does NOT track anything underneath it on its own -
+// top/left are computed here off the actual button's getBoundingClientRect
+// every time it opens, and reposition on every scroll/resize while any
+// picker is open so it stays anchored to its button instead of drifting.
+//
+// Mobile pins it to the actual button that was tapped, and always renders
+// BELOW it (never flipped above) - keeping the swatch and its full ramp
+// visible above the popover while editing is the whole point, so flipping
+// above would defeat that. To guarantee it fits even for the last color in
+// the list, .colors-scroll reserves a large blank margin below the ramps
+// (see the mobile media query) - here we just scroll the page enough, if
+// needed, to open that reserved room up beneath the tapped button.
+//
+// Desktop has no such reserved margin (and no bottom nav to dodge), so it
+// just prefers directly below the button, left-aligned with it (matching
+// the old absolute-positioned look), flipping above and clamping
+// horizontally only when it would otherwise run off the viewport.
+function positionPopover(popover, anchorBtn) {
+  var margin = 10;
+  var popRect = popover.getBoundingClientRect(); // width/height are scroll-independent, measure first
+  var btnRect = anchorBtn.getBoundingClientRect();
+
+  if (window.innerWidth <= 1023) {
+    var navBar = document.querySelector('.mobile-nav');
+    var navTop = navBar ? navBar.getBoundingClientRect().top : window.innerHeight;
+    var needed = popRect.height + 8 + margin;
+    var available = navTop - btnRect.bottom;
+    if (available < needed) {
+      window.scrollBy(0, needed - available);
+      btnRect = anchorBtn.getBoundingClientRect(); // re-measure post-scroll
+    }
+
+    var top = btnRect.bottom + 8;
+    top = Math.max(margin, Math.min(top, navTop - margin - popRect.height));
+
+    var left = btnRect.left + btnRect.width / 2 - popRect.width / 2; // centered on the button
+    left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));
+
+    popover.style.top = top + 'px';
+    popover.style.left = left + 'px';
+    popover.style.transform = 'none';
     return;
   }
-  var margin = 10;
-  var navBar = document.querySelector('.mobile-nav');
-  var navTop = navBar ? navBar.getBoundingClientRect().top : window.innerHeight;
-  var popRect = popover.getBoundingClientRect(); // width/height are scroll-independent, measure first
 
-  var btnRect = anchorBtn.getBoundingClientRect();
-  var needed = popRect.height + 8 + margin;
-  var available = navTop - btnRect.bottom;
-  if (available < needed) {
-    window.scrollBy(0, needed - available);
-    btnRect = anchorBtn.getBoundingClientRect(); // re-measure post-scroll
+  var dTop = btnRect.bottom + 8;
+  if (dTop + popRect.height + margin > window.innerHeight) {
+    dTop = Math.max(margin, btnRect.top - 8 - popRect.height);
   }
-
-  var top = btnRect.bottom + 8;
-  top = Math.max(margin, Math.min(top, navTop - margin - popRect.height));
-
-  var left = btnRect.left + btnRect.width / 2 - popRect.width / 2; // centered on the button
-  left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));
-
-  popover.style.top = top + 'px';
-  popover.style.left = left + 'px';
+  var dLeft = Math.max(margin, Math.min(btnRect.left, window.innerWidth - popRect.width - margin));
+  popover.style.top = dTop + 'px';
+  popover.style.left = dLeft + 'px';
   popover.style.transform = 'none';
 }
-// The popover is position:fixed on mobile (viewport-relative, so it can sit
-// above the nav bar regardless of where its swatch scrolls to), which means
-// it does NOT track the page scrolling underneath it on its own - reposition
-// on every scroll/resize while any picker is open so it stays anchored to its
-// button instead of visually drifting away from it.
-function repositionOpenMobilePopovers() {
+function repositionOpenPopovers() {
   state.colors.forEach(function (c) {
     if (!c.pickerOpen) return;
     var r = colorRefs.get(c.id);
-    if (r) positionMobilePopover(r.popover, r.swatchBtn);
+    if (r) positionPopover(r.popover, r.swatchBtn);
   });
 }
-window.addEventListener('scroll', repositionOpenMobilePopovers, true);
-window.addEventListener('resize', repositionOpenMobilePopovers);
+window.addEventListener('scroll', repositionOpenPopovers, true);
+window.addEventListener('resize', repositionOpenPopovers);
 function onTogglePicker(id, e) {
   e.stopPropagation();
   setState({
@@ -920,7 +932,7 @@ function updateColorItem(id) {
 
   r.swatchBtn.style.background = c.hex;
   r.popover.style.display = c.pickerOpen ? 'flex' : 'none';
-  if (c.pickerOpen) positionMobilePopover(r.popover, r.swatchBtn);
+  if (c.pickerOpen) positionPopover(r.popover, r.swatchBtn);
   r.actionsMenu.style.display = c.actionsOpen ? 'flex' : '';
   if (document.activeElement !== r.eyedropperInput) r.eyedropperInput.value = c.hex;
 
@@ -1120,8 +1132,7 @@ function buildStepper(minWidth) {
 // live in one place, each surface gets its own instance; all instances are
 // kept in module-level arrays so a single state change updates every copy.
 function addColor() {
-  var hex = PRESET_HUES[state.nextId % PRESET_HUES.length];
-  setState({ colors: state.colors.concat([makeColorEntry(state.nextId, hex)]), nextId: state.nextId + 1 });
+  setState({ colors: state.colors.concat([makeColorEntry(state.nextId, randomAutoColorHex())]), nextId: state.nextId + 1 });
 }
 function makeColorCountStepper() {
   var s = buildStepper(40);

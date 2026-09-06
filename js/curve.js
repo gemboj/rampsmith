@@ -185,6 +185,15 @@ function genRamp(hex, X, hue, sat, val) {
 // up clamped to the exact same output, so checking the final percentage
 // directly - not some "was it clamped" magnitude test - is what actually
 // matches what the eye sees).
+//
+// This epsilon is intentionally tight (not the ~0.5 a naive "matches the
+// rounded label" test would need). A value can round to a displayed 100%
+// while sitting meaningfully below it (e.g. 99.6%) with real headroom left
+// and a genuinely still-changing output across steps - see
+// [[clip-flag-threshold-stays-tight]] in project memory. That's not
+// banding, just coarse display rounding, and flagging it reads as a false
+// "may be an unintended clip" on a ramp that isn't clipped at all. Keep
+// this narrow so the flag stays reserved for genuine at-the-ceiling clamps.
 var BOUNDARY_EPSILON = 0.05;
 function boundaryDir(pct) {
   if (pct >= 100 - BOUNDARY_EPSILON) return 'high';
@@ -271,10 +280,14 @@ var DEFAULT_COMPONENTS = {
     leftHandle: { tFrac: 2 / 3, y: -10 }, centerHandleLeft: { tFrac: 1 / 3, y: -5 },
     centerHandleRight: { tFrac: 1 / 3, y: 5 }, rightHandle: { tFrac: 2 / 3, y: 10 },
   },
+  // Mirrored relative to val below: darker steps (left) get more chroma,
+  // lighter steps (right) get less - near-white has little gamut room for
+  // chroma anyway (see maxChromaAt), and it matches how most hand-tuned
+  // ramps actually look (saturated shadows, muted/pastel tints).
   sat: {
-    left: { range: 20, handleType: 'auto' }, center: { range: 50, handleType: 'auto' }, right: { range: 80, handleType: 'auto' },
-    leftHandle: { tFrac: 2 / 3, y: 30 }, centerHandleLeft: { tFrac: 1 / 3, y: 40 },
-    centerHandleRight: { tFrac: 1 / 3, y: 60 }, rightHandle: { tFrac: 2 / 3, y: 70 },
+    left: { range: 80, handleType: 'auto' }, center: { range: 50, handleType: 'auto' }, right: { range: 20, handleType: 'auto' },
+    leftHandle: { tFrac: 2 / 3, y: 70 }, centerHandleLeft: { tFrac: 1 / 3, y: 60 },
+    centerHandleRight: { tFrac: 1 / 3, y: 40 }, rightHandle: { tFrac: 2 / 3, y: 30 },
   },
   val: {
     left: { range: 15, handleType: 'auto' }, center: { range: 52.5, handleType: 'auto' }, right: { range: 90, handleType: 'auto' },

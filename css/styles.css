@@ -130,9 +130,11 @@ a:hover { color: oklch(88% 0.13 195); }
   flex-shrink: 0;
 }
 .popover {
-  position: absolute;
-  top: 56px;
-  left: 0;
+  /* fixed (not absolute) so it escapes .colors-scroll's overflow clipping -
+     top/left are set inline per-open by positionPopover() in app.js, off
+     the actual swatch button's getBoundingClientRect, same as the mobile
+     path below always did. */
+  position: fixed;
   width: 260px;
   z-index: 30;
   background: oklch(19% 0.035 290);
@@ -620,15 +622,12 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
     overflow-y: auto;
     z-index: 50;
   }
-  /* Same problem as .info-popover above: absolutely positioned off the
-     swatch button at a fixed 260px width/z-index 30, which both overflows
-     a phone viewport and renders underneath .mobile-nav (z-index 40).
-     Anchor to the viewport instead of the button so it can never get cut off
-     or hide under the nav bar - top/left/transform are then set inline by
-     positionMobilePopover() per tap, anchored near whichever swatch opened
-     it (a static top/left here would fight with that on every reflow). */
+  /* Same problem as .info-popover above: the fixed 260px width overflows a
+     phone viewport, and it needs to render above .mobile-nav (z-index 40).
+     top/left are set inline by positionPopover() per tap, anchored near
+     whichever swatch opened it (a static top/left here would fight with
+     that on every reflow). */
   .popover {
-    position: fixed;
     width: min(280px, calc(100vw - 32px));
     max-height: calc(100vh - 160px);
     overflow-y: auto;

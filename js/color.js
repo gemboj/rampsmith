@@ -151,3 +151,23 @@ function deriveColorFields(hex) {
 // OKLCH's wheel isn't uniformly spaced like HSV's, so yellow doesn't sit at
 // a round number - computed from the real conversion rather than guessed.
 var OKLCH_YELLOW_H = rgbToOklch(1, 1, 0)[2];
+
+// Random starting color for colors THIS APP picks on its own (initial
+// defaults, "+ Add Color") - never used for a user-entered hex or a decoded
+// share link, where the exact input color must survive unchanged. Hue is
+// unrestricted, but L and the chroma fraction (relative to maxChromaAt,
+// same quantity as the OKLCH panel's C%) are kept within an interior band:
+// wide enough to feel varied, narrow enough to avoid muddy/grayish results
+// at the low end and edge-hugging chroma at the high end (a color generated
+// right at its own gamut ceiling leaves a shift ramp almost no headroom to
+// increase chroma further - see [[clip-flag-threshold-stays-tight]] in
+// project memory).
+var AUTO_COLOR_L_RANGE = [50, 75];
+var AUTO_COLOR_CHROMA_FRAC_RANGE = [70, 95];
+function randomAutoColorHex() {
+  var H = Math.random() * 360;
+  var L = (AUTO_COLOR_L_RANGE[0] + Math.random() * (AUTO_COLOR_L_RANGE[1] - AUTO_COLOR_L_RANGE[0])) / 100;
+  var cFrac = AUTO_COLOR_CHROMA_FRAC_RANGE[0] + Math.random() * (AUTO_COLOR_CHROMA_FRAC_RANGE[1] - AUTO_COLOR_CHROMA_FRAC_RANGE[0]);
+  var C = (cFrac / 100) * maxChromaAt(L, H);
+  return oklchToHex(L, C, H);
+}

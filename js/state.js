@@ -4,8 +4,6 @@
 // (Main.dc.html:2364-2369, using encodeShift) - this just also parses it
 // back on load and writes it to location.hash instead of only displaying it.
 
-var PRESET_HUES = ['#e63946', '#2a9d8f', '#f4a261', '#8338ec', '#ffbe0b', '#06d6a0', '#ff006e', '#4361ee'];
-
 function makeColorEntry(id, hex) {
   var fields = deriveColorFields(hex);
   return Object.assign({
@@ -23,8 +21,8 @@ function createDefaultState() {
   var initialX = 4;
   return {
     colors: [
-      makeColorEntry(1, '#ff8800'),
-      makeColorEntry(2, '#3366cc'),
+      makeColorEntry(1, randomAutoColorHex()),
+      makeColorEntry(2, randomAutoColorHex()),
     ],
     nextId: 3,
     X: initialX,

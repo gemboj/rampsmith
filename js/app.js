@@ -743,18 +743,19 @@ function onHexDraftChange(id, v) {
 // picker is open so it stays anchored to its button instead of drifting.
 //
 // Mobile pins it to the actual button that was tapped, and always renders
-// BELOW it (never flipped above) - keeping the swatch and its full ramp
-// visible above the popover while editing is the whole point, so flipping
-// above would defeat that. It's clamped against the actual viewport bottom
-// (not the top of .mobile-nav), so for a swatch near the bottom of the list
-// it deliberately overlaps/renders on top of the nav bar (.popover's z-index
-// is above .mobile-nav's - see the mobile media query) rather than pushing
-// the page to scroll the ramps up to dodge it. That scroll-to-dodge used to
-// run on every reposition (including the scroll/resize listener below), so
-// scrolling the list while the popover was open could fight with it - each
-// scroll re-triggering another corrective scroll - producing a visible
-// shake before it settled. Overlapping the nav bar for a moment is a much
-// smaller cost than that feedback loop.
+// BELOW it, top clamped only against the top margin - never pulled back up
+// to fit above the viewport bottom, so it can never end up covering the
+// swatch/ramp it belongs to. It CAN run past the bottom of the screen (or
+// over .mobile-nav, whose z-index sits below .popover's - see the mobile
+// media query) - scrollToRevealPopover(), called once right when a picker
+// opens, scrolls the page just enough that this doesn't normally happen.
+// That one-time scroll is deliberately NOT done here or from the
+// scroll/resize listener below: doing it on every reposition meant a scroll
+// gesture while the popover was open could fight its own corrective scroll -
+// each scroll event re-triggering another one - producing a visible shake
+// before it settled. Keeping the corrective scroll to a single call at open
+// time (see onTogglePicker) means this function only ever follows the
+// button, never causes further scrolling itself, so it can't loop.
 //
 // Desktop has no such reserved margin (and no bottom nav to dodge), so it
 // just prefers directly below the button, left-aligned with it (matching
@@ -766,8 +767,7 @@ function positionPopover(popover, anchorBtn) {
   var btnRect = anchorBtn.getBoundingClientRect();
 
   if (window.innerWidth <= 1023) {
-    var top = btnRect.bottom + 8;
-    top = Math.max(margin, Math.min(top, window.innerHeight - margin - popRect.height));
+    var top = Math.max(margin, btnRect.bottom + 8);
 
     var left = btnRect.left + btnRect.width / 2 - popRect.width / 2; // centered on the button
     left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));
@@ -787,6 +787,25 @@ function positionPopover(popover, anchorBtn) {
   popover.style.left = dLeft + 'px';
   popover.style.transform = 'none';
 }
+// One-time scroll, run only when a picker is first opened (never from the
+// scroll/resize listener - see positionPopover's comment on why that would
+// loop): if the popover doesn't fully fit between the tapped button and the
+// bottom of the viewport, scrolls the page down by exactly the shortfall so
+// it does, rather than leaving it to spill past the screen edge. Overlapping
+// .mobile-nav at the very bottom is fine (see positionPopover); the button
+// itself never getting covered is the thing this guarantees.
+function scrollToRevealPopover(popover, anchorBtn) {
+  if (window.innerWidth > 1023) return; // desktop already fits without scrolling the page
+  var margin = 10;
+  var popRect = popover.getBoundingClientRect();
+  var btnRect = anchorBtn.getBoundingClientRect();
+  var needed = popRect.height + 8 + margin;
+  var available = window.innerHeight - btnRect.bottom;
+  if (available < needed) {
+    window.scrollBy(0, needed - available);
+    positionPopover(popover, anchorBtn); // re-anchor immediately using the post-scroll button position
+  }
+}
 function repositionOpenPopovers() {
   state.colors.forEach(function (c) {
     if (!c.pickerOpen) return;
@@ -798,6 +817,7 @@ window.addEventListener('scroll', repositionOpenPopovers, true);
 window.addEventListener('resize', repositionOpenPopovers);
 function onTogglePicker(id, e) {
   e.stopPropagation();
+  var willOpen = !getColor(id).pickerOpen;
   setState({
     selectedAnchor: null,
     colors: state.colors.map(function (x) {
@@ -805,6 +825,10 @@ function onTogglePicker(id, e) {
       return x.pickerOpen ? Object.assign({}, x, { pickerOpen: false }) : x;
     }),
   });
+  if (willOpen) {
+    var r = colorRefs.get(id);
+    if (r) scrollToRevealPopover(r.popover, r.swatchBtn);
+  }
 }
 function onClosePicker(id) {
   setState({ colors: state.colors.map(function (x) { return x.id === id ? Object.assign({}, x, { pickerOpen: false }) : x; }) });
@@ -1314,7 +1338,7 @@ function buildBottomPanel() {
   var shiftIcon = svgFromMarkup('<svg width="34" height="34" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="18" height="18" stroke="currentColor" stroke-width="1.4"></rect><polyline points="3.5,15 8,6.5 11,11.5 16.5,3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>');
   refs.tabShiftBtn = h('div', { className: 'tab-btn vtab-icon-btn', title: 'Shift Settings' }, shiftIcon);
 
-  var wheelIcon = svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="8"></circle><circle cx="10" cy="10" r="4"></circle></svg>');
+  var wheelIcon = svgFromMarkup('<svg width="30" height="30" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="8"></circle><circle cx="10" cy="10" r="4"></circle></svg>');
   refs.tabWheelBtn = h('div', { className: 'tab-btn vtab-icon-btn', title: 'Color Wheel' }, wheelIcon);
 
   // Switching tabs must not bubble to onRootClick (root.addEventListener

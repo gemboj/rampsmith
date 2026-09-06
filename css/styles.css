@@ -568,13 +568,17 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
      bordered bar above the wheel disc. */
   .pf-content[data-mobile-tab="wheel"] .vertical-tabs { display: none; }
 
-  /* margin-bottom (not padding on the bordered panel inside) leaves a little
-     breathing room below the last ramp above the fixed nav bar. The popover
-     (see positionPopover in app.js) no longer needs scroll room reserved
-     here - it's clamped to the viewport bottom and deliberately overlaps the
-     nav bar (which sits above it, z-index-wise) for a swatch near the end of
-     the list rather than forcing a scroll to dodge it. */
-  .colors-panel { min-height: 0; margin-bottom: 24px; }
+  /* margin-bottom (not padding on the bordered panel inside) reserves room
+     below the last ramp for scrollToRevealPopover() (see app.js) to actually
+     scroll into - without it, the page could be too short to scroll far
+     enough to uncover the popover for a swatch near the end of the list, no
+     matter how much room the popover needs. 340px comfortably covers the
+     popover's tallest state (see .popover's max-height) plus margin; putting
+     it here (outside the bordered box) keeps that box snug around the
+     actual ramp content. Overlapping .mobile-nav at the very bottom is fine
+     (.popover renders above it - see the z-index below), so this only needs
+     to cover the popover's own height, not the nav bar's on top of that. */
+  .colors-panel { min-height: 0; margin-bottom: 340px; }
   .colors-scroll { flex: none; overflow-y: visible; }
   .desktop-controls-row { display: none; }
   .mobile-controls-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-shrink: 0; }
@@ -666,7 +670,13 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
 }
 
 @media (max-width: 640px) {
-  .pf-content { padding: 16px 10px 24px; gap: 16px; }
+  /* Bottom padding must stay the same reserved amount as the ≤1023px rule
+     above - it's what keeps content (e.g. the last curve card on the Shift
+     tab) clear of the fixed .mobile-nav bar. This rule only needs to tighten
+     the horizontal/top padding for narrow phones, so it repeats that value
+     here rather than falling back to a plain 24px that let the nav bar cover
+     the bottom of the scrolled content on most phone widths. */
+  .pf-content { padding: 16px 10px calc(84px + env(safe-area-inset-bottom, 0px)); gap: 16px; }
   .ramp-swatch { width: 28px; height: 28px; }
   .ramp-swatch-center { width: 34px; height: 34px; }
   .pixel-label { font-size: clamp(11px, 3.2vw, 14px); }

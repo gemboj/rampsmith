@@ -50,6 +50,20 @@ function formatColorDisplay(hex, mode) {
   return hex.toUpperCase();
 }
 
+// Same output shape as formatColorDisplay, but for a base color entry (see
+// makeColorEntry) specifically: reads its already-pinned hsvH/S/V and
+// oklchL/C/H rather than re-deriving them from c.hex. Deriving from hex would
+// round-trip through 8-bit RGB, which is lossy - e.g. dragging V down toward
+// black quantizes R/G/B enough that the hue/saturation it implies visibly
+// drifts from what commitHsv actually pinned. A ramp *step* color has no such
+// pinned fields (it's pure curve output), so formatColorDisplay's hex-based
+// derivation is what renderSelectedLabel (below) still needs to use.
+function formatBaseColorDisplay(c, mode) {
+  if (mode === 'hsv') return 'H:' + (c.hsvH || 0) + ' S:' + (c.hsvS || 0) + ' V:' + (c.hsvV || 0);
+  if (mode === 'oklch') return 'L:' + (c.oklchL || 0) + ' C:' + (c.oklchC || 0) + ' H:' + (c.oklchH || 0);
+  return c.hex.toUpperCase();
+}
+
 function hsvToRgb(h, s, v) {
   s = s / 100; v = v / 100;
   var c = v * s;

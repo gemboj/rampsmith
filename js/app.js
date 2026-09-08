@@ -1054,7 +1054,7 @@ function updateColorItem(id) {
   r.detailsRow.style.display = isCompact ? 'none' : 'flex';
   if (isCompact) return;
 
-  r.displayLabel.textContent = formatColorDisplay(c.hex, state.colorDisplayMode);
+  r.displayLabel.textContent = formatBaseColorDisplay(c, state.colorDisplayMode);
   if (hasSelection) renderSelectedLabel(r.selectedLabel, ramp[selIndex], state.colorDisplayMode, clipFlags[selIndex]);
   else r.selectedLabel.textContent = ' ';
   r.selectedLabel.style.visibility = hasSelection ? 'visible' : 'hidden';

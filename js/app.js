@@ -61,6 +61,14 @@ var compactToggleInstances = [];
 var sortBtnInstances = [];
 var totalColorsTexts = [];
 
+// Undo/redo: a capped rolling history of configSnapshot(state) (state.js),
+// recorded automatically from setState (below) rather than at each call
+// site, so no config-changing code path can forget to record a step.
+var configHistory = [];
+var historyIndex = -1;
+var isTimeTraveling = false;
+var _historyPushTimer = null;
+
 var WHEEL_SIZE = 380, WHEEL_MARKER_R = 7, WHEEL_HIT_R = 13;
 // Amber, not the pink used for delete/remove-btn - this flags a possible
 // ramp-generation issue (see rampClipFlags in curve.js), not a destructive
@@ -69,10 +77,68 @@ var CLIP_WARN_COLOR = 'oklch(78% 0.16 70)';
 var wheelCx = WHEEL_SIZE / 2, wheelCy = WHEEL_SIZE / 2;
 var wheelEffR = WHEEL_SIZE / 2 - WHEEL_MARKER_R - 4;
 
+var CONFIG_PATCH_KEYS = ['X', 'colors', 'shiftConfigs', 'activeConfig', 'nextId'];
+function touchesConfig(patch) {
+  return CONFIG_PATCH_KEYS.some(function (k) { return Object.prototype.hasOwnProperty.call(patch, k); });
+}
 function setState(patch) {
   Object.assign(state, patch);
   render();
   scheduleWriteStateToHash(state);
+  if (!isTimeTraveling && touchesConfig(patch)) scheduleRecordHistory();
+}
+
+// Debounced the same way as scheduleWriteStateToHash - a drag fires many
+// setState calls per second, and each should collapse into one history
+// entry instead of dozens.
+function scheduleRecordHistory() {
+  clearTimeout(_historyPushTimer);
+  _historyPushTimer = setTimeout(recordHistory, 200);
+}
+function recordHistory() {
+  var snap = configSnapshot(state);
+  if (historyIndex >= 0 && snapshotsEqual(snap, configHistory[historyIndex])) return;
+  configHistory = configHistory.slice(0, historyIndex + 1);
+  configHistory.push(snap);
+  if (configHistory.length > CONFIG_HISTORY_MAX) configHistory.shift();
+  historyIndex = configHistory.length - 1;
+  updateUndoRedoButtons();
+}
+function applyHistorySnapshot(snap) {
+  var colors = snap.colors.map(function (sc) {
+    var existing = getColor(sc.id);
+    var base = existing || makeColorEntry(sc.id, sc.hex);
+    return Object.assign({}, base, { hex: sc.hex, configIndex: sc.configIndex }, deriveColorFields(sc.hex));
+  });
+  isTimeTraveling = true;
+  setState({
+    X: snap.X,
+    nextId: snap.nextId,
+    activeConfig: snap.activeConfig,
+    shiftConfigs: snap.shiftConfigs.map(function (c) { return Object.assign({}, c); }),
+    colors: colors,
+  });
+  isTimeTraveling = false;
+}
+function undo() {
+  if (historyIndex <= 0) return;
+  historyIndex--;
+  applyHistorySnapshot(configHistory[historyIndex]);
+  updateUndoRedoButtons();
+}
+function redo() {
+  if (historyIndex >= configHistory.length - 1) return;
+  historyIndex++;
+  applyHistorySnapshot(configHistory[historyIndex]);
+  updateUndoRedoButtons();
+}
+function updateUndoRedoButtons() {
+  var undoStyle = historyIndex > 0 ? '' : STYLE_DISABLED;
+  var redoStyle = historyIndex < configHistory.length - 1 ? '' : STYLE_DISABLED;
+  if (refs.undoBtn) refs.undoBtn.style.cssText = undoStyle;
+  if (refs.redoBtn) refs.redoBtn.style.cssText = redoStyle;
+  if (refs.mobileUndoBtn) refs.mobileUndoBtn.style.cssText = undoStyle;
+  if (refs.mobileRedoBtn) refs.mobileRedoBtn.style.cssText = redoStyle;
 }
 
 function currentCompFor(key) { return state.shiftConfigs[state.activeConfig || 0][key]; }
@@ -1358,6 +1424,17 @@ function buildMobileNav() {
     refs.mobileNavBtns[item.key] = btn;
     nav.appendChild(btn);
   });
+
+  var divider = h('div', { className: 'mobile-nav-divider' });
+  refs.mobileUndoBtn = h('div', { className: 'bevel-raised action-btn action-btn-sm', title: 'Undo' },
+    svgFromMarkup('<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h8a5 5 0 1 1 0 10h-3"></path><path d="M7.5 3.5L4 7l3.5 3.5"></path></svg>'));
+  refs.mobileUndoBtn.addEventListener('click', function (e) { e.stopPropagation(); undo(); });
+  refs.mobileRedoBtn = h('div', { className: 'bevel-raised action-btn action-btn-sm', title: 'Redo' },
+    svgFromMarkup('<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7H8a5 5 0 1 0 0 10h3"></path><path d="M12.5 3.5L16 7l-3.5 3.5"></path></svg>'));
+  refs.mobileRedoBtn.addEventListener('click', function (e) { e.stopPropagation(); redo(); });
+  var historyGroup = h('div', { className: 'mobile-nav-history' }, [divider, refs.mobileUndoBtn, refs.mobileRedoBtn]);
+  nav.appendChild(historyGroup);
+
   return nav;
 }
 
@@ -1451,13 +1528,19 @@ function buildShell() {
 
   var shareLabel = h('div', { className: 'pixel-text share-label', style: 'font-size:11px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;' }, 'Share Link — updates live');
   refs.shareText = h('div', { className: 'bevel-well pixel-text share-url-bar', style: 'width:min(460px, 100%);flex:1;min-width:0;height:40px;display:flex;align-items:center;padding:0 12px;background:oklch(11% 0.025 290);color:oklch(92% 0.01 290);font-size:14px;overflow:hidden;white-space:nowrap;' });
+  refs.undoBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Undo' },
+    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h8a5 5 0 1 1 0 10h-3"></path><path d="M7.5 3.5L4 7l3.5 3.5"></path></svg>'));
+  refs.undoBtn.addEventListener('click', undo);
+  refs.redoBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Redo' },
+    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7H8a5 5 0 1 0 0 10h3"></path><path d="M12.5 3.5L16 7l-3.5 3.5"></path></svg>'));
+  refs.redoBtn.addEventListener('click', redo);
   refs.copyBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Copy share link' },
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><rect x="7" y="7" width="10" height="10"></rect><path d="M4 13V4a1 1 0 0 1 1-1h9"></path></svg>'));
   refs.copyBtn.addEventListener('click', onCopyShare);
   var exportBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Export palette as PNG' },
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M10 3v9M6 8l4 4 4-4"></path><path d="M4 15v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1"></path></svg>'));
   exportBtn.addEventListener('click', function () { exportPaletteAsPng(state); });
-  var shareRow = h('div', { style: 'display:flex;gap:8px;min-width:0;' }, [refs.shareText, refs.copyBtn, exportBtn]);
+  var shareRow = h('div', { style: 'display:flex;gap:8px;min-width:0;' }, [refs.shareText, refs.undoBtn, refs.redoBtn, refs.copyBtn, exportBtn]);
   var headerRight = h('div', { className: 'pf-header-right', style: 'display:flex;flex-direction:column;gap:6px;' }, [shareLabel, shareRow]);
 
   var header = h('div', { className: 'pf-header' }, [headerLeft, headerRight]);
@@ -1480,10 +1563,23 @@ function render() {
   updateMobileNav();
 }
 
+function onHistoryKeydown(e) {
+  var active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  var key = e.key.toLowerCase();
+  if (key === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+  else if (key === 'y') { e.preventDefault(); redo(); }
+}
+
 function boot() {
   var initialPatch = readStateFromLocation();
   state = Object.assign(createDefaultState(), initialPatch || {});
+  configHistory = [configSnapshot(state)];
+  historyIndex = 0;
   buildShell();
   render();
+  updateUndoRedoButtons();
+  document.addEventListener('keydown', onHistoryKeydown);
 }
 boot();

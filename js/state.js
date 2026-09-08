@@ -133,3 +133,23 @@ function scheduleWriteStateToHash(state) {
 function shareUrlFor(state) {
   return location.origin + location.pathname + '#' + encodeShareQuery(state);
 }
+
+// Undo/redo history snapshots - the output-affecting subset of state (same
+// idea as encodeShareQuery above, but capturing full shiftConfigs rather
+// than just the ones currently assigned to a color, so edits to an unused
+// config slot are undoable too). Excludes view/selection-only state
+// (selectedStep, rightTab, pickerOpen, etc.) so those never create undo
+// steps.
+var CONFIG_HISTORY_MAX = 30;
+function configSnapshot(state) {
+  return {
+    X: state.X,
+    nextId: state.nextId,
+    activeConfig: state.activeConfig,
+    shiftConfigs: state.shiftConfigs.map(function (c) { return Object.assign({}, c); }),
+    colors: state.colors.map(function (c) { return { id: c.id, hex: c.hex, configIndex: c.configIndex || 0 }; }),
+  };
+}
+function snapshotsEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}

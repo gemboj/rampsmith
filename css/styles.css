@@ -524,6 +524,13 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
 }
 .mobile-nav-label { font-size: 9px; letter-spacing: 0.5px; }
 
+/* Undo/redo: icon-only and fixed-width (unlike the flex:1 tab buttons
+   above), set apart by a divider so they read as actions on the bar, not
+   as two more destinations to switch to - same idea as .config-controls-row
+   separating its action icons from the shift/wheel tabs it sits beside. */
+.mobile-nav-history { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 0 6px; }
+.mobile-nav-divider { width: 1px; align-self: stretch; margin: 10px 0; background: oklch(30% 0.04 290); }
+
 .desktop-controls-row { display: flex; }
 .mobile-controls-row { display: none; }
 

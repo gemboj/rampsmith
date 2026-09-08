@@ -869,7 +869,7 @@ function onCopyHex(id) {
   try { navigator.clipboard.writeText(hexToCopy); } catch (e) {}
   clearTimeout(colorCopyTimer);
   setState({ copiedColorId: id });
-  colorCopyTimer = setTimeout(function () { setState({ copiedColorId: null }); }, 350);
+  colorCopyTimer = setTimeout(function () { setState({ copiedColorId: null }); }, 200);
 }
 function onRemoveColor(id) {
   var patch = { colors: state.colors.filter(function (x) { return x.id !== id; }) };
@@ -961,6 +961,7 @@ function updateColorItem(id) {
     sw.addEventListener('click', function (e) {
       e.stopPropagation();
       setState({ selectedStep: i - X, selectedColorId: id });
+      onCopyHex(id);
     });
     r.rampRow.appendChild(sw);
   });

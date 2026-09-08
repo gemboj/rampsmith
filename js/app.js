@@ -485,15 +485,21 @@ function buildMobileShiftPreview() {
   return refs.shiftPreviewWrap;
 }
 
+// Swiping the preview is an explicit "change preview color" action, so
+// (unlike just switching into the Shift/Wheel tab) it also selects the ramp
+// it lands on - keeping whichever swatch step was already selected (or none,
+// if none was) rather than resetting it. See [[preview-select-sync]].
 function onPreviewPrev() {
   var len = state.colors.length;
   if (len === 0) return;
-  setState({ previewIndex: ((state.previewIndex || 0) - 1 + len) % len });
+  var idx = ((state.previewIndex || 0) - 1 + len) % len;
+  setState({ previewIndex: idx, selectedColorId: state.colors[idx].id });
 }
 function onPreviewNext() {
   var len = state.colors.length;
   if (len === 0) return;
-  setState({ previewIndex: ((state.previewIndex || 0) + 1) % len });
+  var idx = ((state.previewIndex || 0) + 1) % len;
+  setState({ previewIndex: idx, selectedColorId: state.colors[idx].id });
 }
 
 function updateShiftPreview() {
@@ -583,13 +589,10 @@ function ensureWheelMarker(id) {
     var idx = state.colors.findIndex(function (c) { return c.id === id; });
     if (idx === -1) return;
     // Clicking a wheel dot always switches focus (tint + preview) to that
-    // color. The highlighted swatch step is shared across every ramp, so it
-    // only needs a default (the base swatch, step 0) when nothing was
-    // selected yet - otherwise leave whichever step was already active.
-    var hasSelection = state.selectedStep !== null && state.selectedStep !== undefined;
-    var patch = { previewIndex: idx, selectedColorId: id };
-    if (!hasSelection) patch.selectedStep = 0;
-    setState(patch);
+    // color - same "change preview color" convention as swiping the preview
+    // strip (see [[preview-select-sync]]): keep whichever swatch step was
+    // already selected (or none) rather than forcing one.
+    setState({ previewIndex: idx, selectedColorId: id });
   });
   hit.addEventListener('pointermove', function (e) {
     if (e.buttons === 0) return;
@@ -661,6 +664,14 @@ function ensureColorRefs(id) {
   if (colorRefs.has(id)) return colorRefs.get(id);
 
   var rampRow = h('div', {});
+  // Clicking the row itself (not a specific swatch - those stop propagation
+  // in their own handler below) selects the whole ramp without pinning a
+  // step, so the mobile preview/wheel can follow a color without forcing a
+  // particular swatch to be highlighted.
+  rampRow.addEventListener('click', function (e) {
+    e.stopPropagation();
+    setState({ selectedColorId: id, selectedStep: null });
+  });
 
   var swatchBtn = h('div', { className: 'bevel-raised color-input' });
   swatchBtn.addEventListener('click', function (e) { onTogglePicker(id, e); });
@@ -1425,6 +1436,17 @@ function buildMobileNav() {
       e.stopPropagation();
       var patch = { mobileTab: item.key };
       if (item.key === 'shift' || item.key === 'wheel') patch.rightTab = item.key;
+      // Shift/Wheel/Settings all show the preview strip (see [[preview-select-
+      // sync]]) - entering one re-derives which ramp it shows from the
+      // current selection, without selecting anything itself: the selected
+      // ramp if there is one, else just the first color, left unselected.
+      if (item.key === 'shift' || item.key === 'wheel' || item.key === 'settings') {
+        if (state.colors.length) {
+          var selIdx = state.selectedColorId == null ? -1
+            : state.colors.findIndex(function (c) { return c.id === state.selectedColorId; });
+          patch.previewIndex = selIdx !== -1 ? selIdx : 0;
+        }
+      }
       setState(patch);
     });
     refs.mobileNavBtns[item.key] = btn;

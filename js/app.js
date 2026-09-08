@@ -1534,10 +1534,10 @@ function buildShell() {
 
   var shareLabel = h('div', { className: 'pixel-text share-label', style: 'font-size:11px;color:oklch(65% 0.02 290);letter-spacing:2px;text-transform:uppercase;' }, 'Share Link — updates live');
   refs.shareText = h('div', { className: 'bevel-well pixel-text share-url-bar', style: 'width:min(460px, 100%);flex:1;min-width:0;height:40px;display:flex;align-items:center;padding:0 12px;background:oklch(11% 0.025 290);color:oklch(92% 0.01 290);font-size:14px;overflow:hidden;white-space:nowrap;' });
-  refs.undoBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Undo' },
+  refs.undoBtn = h('div', { className: 'bevel-raised copy-btn header-history-btn', title: 'Undo' },
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h8a5 5 0 1 1 0 10h-3"></path><path d="M7.5 3.5L4 7l3.5 3.5"></path></svg>'));
   refs.undoBtn.addEventListener('click', undo);
-  refs.redoBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Redo' },
+  refs.redoBtn = h('div', { className: 'bevel-raised copy-btn header-history-btn', title: 'Redo' },
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7H8a5 5 0 1 0 0 10h3"></path><path d="M12.5 3.5L16 7l-3.5 3.5"></path></svg>'));
   refs.redoBtn.addEventListener('click', redo);
   refs.copyBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Copy share link' },

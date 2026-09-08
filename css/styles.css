@@ -508,7 +508,7 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
   justify-content: center;
   gap: 4px;
   flex: 1;
-  padding: 8px 4px;
+  padding: 8px 2px;
   color: oklch(65% 0.02 290);
   cursor: pointer;
   user-select: none;
@@ -528,7 +528,7 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
    above), set apart by a divider so they read as actions on the bar, not
    as two more destinations to switch to - same idea as .config-controls-row
    separating its action icons from the shift/wheel tabs it sits beside. */
-.mobile-nav-history { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 0 6px; }
+.mobile-nav-history { display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding: 0 8px; }
 .mobile-nav-divider { width: 1px; align-self: stretch; margin: 10px 0; background: oklch(30% 0.04 290); }
 
 .desktop-controls-row { display: flex; }
@@ -569,6 +569,9 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
   .pf-header { height: auto; padding: 12px 14px; }
   .app-tagline { display: none; }
   .share-label, .share-url-bar { display: none !important; }
+  /* Undo/redo already live on the mobile nav bar (.mobile-nav-history) -
+     drop the header's copies so they don't show up twice on mobile. */
+  .header-history-btn { display: none !important; }
   .pf-header-right { align-items: stretch; max-width: none; }
 
   .pf-content { flex-direction: column; padding: 16px 14px calc(84px + env(safe-area-inset-bottom, 0px)); gap: 20px; overflow: visible; }
@@ -704,4 +707,9 @@ body::-webkit-scrollbar-thumb:hover, .colors-scroll::-webkit-scrollbar-thumb:hov
   .step-btn { width: 40px; height: 40px; }
   .remove-btn, .color-input { min-width: 44px; min-height: 44px; }
   .action-btn { width: 44px; height: 44px; }
+  /* .action-btn-sm elements (e.g. the mobile nav's undo/redo) carry both
+     classes - same specificity as .action-btn above, so without this they'd
+     silently inherit its 44px and blow the "-sm" size out. Restore it here,
+     after .action-btn, so source order puts it back on top. */
+  .action-btn-sm { width: 28px; height: 28px; }
 }

@@ -138,14 +138,14 @@ function shareUrlFor(state) {
 // idea as encodeShareQuery above, but capturing full shiftConfigs rather
 // than just the ones currently assigned to a color, so edits to an unused
 // config slot are undoable too). Excludes view/selection-only state
-// (selectedStep, rightTab, pickerOpen, etc.) so those never create undo
-// steps.
+// (selectedStep, rightTab, pickerOpen, activeConfig - which configuration the
+// Shift tab happens to be displaying, not something that changes any ramp -
+// etc.) so those never create undo steps.
 var CONFIG_HISTORY_MAX = 30;
 function configSnapshot(state) {
   return {
     X: state.X,
     nextId: state.nextId,
-    activeConfig: state.activeConfig,
     shiftConfigs: state.shiftConfigs.map(function (c) { return Object.assign({}, c); }),
     colors: state.colors.map(function (c) { return { id: c.id, hex: c.hex, configIndex: c.configIndex || 0 }; }),
   };

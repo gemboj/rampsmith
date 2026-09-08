@@ -77,7 +77,10 @@ var CLIP_WARN_COLOR = 'oklch(78% 0.16 70)';
 var wheelCx = WHEEL_SIZE / 2, wheelCy = WHEEL_SIZE / 2;
 var wheelEffR = WHEEL_SIZE / 2 - WHEEL_MARKER_R - 4;
 
-var CONFIG_PATCH_KEYS = ['X', 'colors', 'shiftConfigs', 'activeConfig', 'nextId'];
+// activeConfig (which config the Shift tab is displaying) is deliberately
+// left out - cycling it via the dice button doesn't change any ramp, so it
+// shouldn't create an undo step (see configSnapshot in state.js).
+var CONFIG_PATCH_KEYS = ['X', 'colors', 'shiftConfigs', 'nextId'];
 function touchesConfig(patch) {
   return CONFIG_PATCH_KEYS.some(function (k) { return Object.prototype.hasOwnProperty.call(patch, k); });
 }
@@ -114,7 +117,6 @@ function applyHistorySnapshot(snap) {
   setState({
     X: snap.X,
     nextId: snap.nextId,
-    activeConfig: snap.activeConfig,
     shiftConfigs: snap.shiftConfigs.map(function (c) { return Object.assign({}, c); }),
     colors: colors,
   });

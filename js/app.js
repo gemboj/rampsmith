@@ -1541,7 +1541,7 @@ function buildShell() {
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7H8a5 5 0 1 0 0 10h3"></path><path d="M12.5 3.5L16 7l-3.5 3.5"></path></svg>'));
   refs.redoBtn.addEventListener('click', redo);
   refs.copyBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Copy share link' },
-    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><rect x="7" y="7" width="10" height="10"></rect><path d="M4 13V4a1 1 0 0 1 1-1h9"></path></svg>'));
+    svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="7" y1="8.8" x2="13" y2="6"></line><line x1="7" y1="11.2" x2="13" y2="14"></line><circle cx="15" cy="5" r="2.4" fill="currentColor"></circle><circle cx="15" cy="15" r="2.4" fill="currentColor"></circle><circle cx="5" cy="10" r="2.4" fill="currentColor"></circle></svg>'));
   refs.copyBtn.addEventListener('click', onCopyShare);
   var exportBtn = h('div', { className: 'bevel-raised copy-btn', title: 'Export palette as PNG' },
     svgFromMarkup('<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M10 3v9M6 8l4 4 4-4"></path><path d="M4 15v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1"></path></svg>'));

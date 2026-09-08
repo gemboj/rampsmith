@@ -1026,8 +1026,14 @@ function updateColorItem(id) {
     }
     sw.addEventListener('click', function (e) {
       e.stopPropagation();
+      // Click-again-to-copy: the first click on a swatch only selects it
+      // (silent, no flash) so browsing through several swatches never
+      // copies/flashes anything - each is a first click on a new target.
+      // Clicking the already-selected swatch a second time is what copies,
+      // state-based rather than timing-based so it's immune to click cadence.
+      var alreadySelected = state.selectedColorId === id && state.selectedStep === i - X;
       setState({ selectedStep: i - X, selectedColorId: id });
-      onCopyHex(id);
+      if (alreadySelected) onCopyHex(id);
     });
     r.rampRow.appendChild(sw);
   });
